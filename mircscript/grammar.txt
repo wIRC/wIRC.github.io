@@ -1,0 +1,191 @@
+{
+    function extractList(list, index) {
+        return list.map(function(element) { return element[index]; });
+    }
+
+    function buildList(head, tail, index) {
+        return [head].concat(extractList(tail, index));
+    }
+
+    function buildBinaryExpression(head, tail) {
+        return tail.reduce(function(result, element) {
+            return {
+                type: "BinaryExpression",
+                operator: element[1],
+                left: result,
+                right: element[3]
+            };
+        }, head);
+    }
+    function trim(str) { return str.replace(/^\s+|\s+$/, ''); }
+}
+
+Program
+  = "P" (_ nl)* p:ProgramLines (_ nl)* { return {type: 'Program', body: p}; }
+  / "C" _ c:Command _ { return c; }
+  / "S" _ s:Statement _ { return s; }
+  / "I" _ i:Identifier _ { return i; }
+  / "B" _ b:BooleanExpression _ { return b; }
+
+ProgramLine
+  = event:Event { return event; }
+  / alias:Alias { return alias; }
+  / JS { return {type: 'JS', expression: text()} }
+
+JS
+  = JSLine ([\n] JSLine)*
+  
+JSLine
+  = !Alias !Event (![\n] .)+
+
+ProgramLines
+  = head:ProgramLine tail:((_ nl)* tail:ProgramLine)* { return buildList(head, tail, 1); }
+
+Alias 
+  = "alias"i __ name:IdentifierName __ body:Body
+  { return {type: 'Alias', name: name, body:body}; }
+
+EventToken = (![:\n] .)* { return text(); }
+EventType1 = "connect"i / "disconnect"i / "nick"i
+EventType2 = "input"i / "invite"i / "join"i / "mode"i / "topic"i
+EventType3 = "text"i / "action"i / "notice"i
+
+Event
+  = "on"i __ level:EventToken _ ":" _ name:EventType1 _ ":" _ body:Body
+  { return {type: 'Event', level: level, name: name, body: body} }
+  / "on"i __ level:EventToken _ ":" _ name:EventType2 _ ":" _ text:EventToken _ ":" _ body:Body
+  { return {type: 'Event', level: level, name: name, target: target, body: body} }
+  / "on"i __ level:EventToken _ ":" _ name:EventType3 _ ":" _ text:EventToken _ ":" _ target:EventToken _ ":" _ body:Body
+  { return {type: 'Event', level: level, name: name, text: text, target: target, body: body} }
+
+
+Body "Body"
+  = _ block:Block _ { return block; }
+  / _ statement:Statement _ { return statement; }
+
+Block "Block"
+  = "{" [ \t\n]* statements:Statements [ \t\n]* "}" { return {type: 'Block', statements: statements}; }
+
+Statements
+  = head:Statement tail:([ \t\n]+ !"}" Statement)* { return buildList(head, tail, 2); }
+
+// any construct or line
+Statement
+  = IfStatement
+  / WhileStatement
+  / VariableDeclaration
+  / VariableAssignment
+  / VariableIncrement
+  / VariableDecrement
+  / c:Command { return {type: 'Statement', tokens: text()}; }
+
+// any line
+Command
+  = head:CommandToken tail:(CommandToken)* { return [head].concat(tail); }
+
+CommandChar = c:(Glue ![$%\n] .) Glue$ { return c[2]; }
+CommandToken
+  = expr:(CommandChar+)  { return {type: 'String', value: expr.join("")}; }
+  / Glue expr:(Identifier/Variable) Glue$ { return expr; }
+
+IfStatement
+  = "if"i _ "(" _ test:BooleanExpression _ ")" _ consequent:Body _ nl _ "else"i alternate:IfStatement 
+  { return {type: 'IfStatement', test:test, consequent: consequent, alternate: alternate}; }
+  / "if"i _ "(" _ test:BooleanExpression _ ")" _ consequent:Body _ nl _ "else"i _ alternate:Body
+  { return {type: 'IfStatement', test:test, consequent: consequent, alternate: alternate}; }
+  / "if"i _ "(" _ test:BooleanExpression _ ")" _ consequent:Body 
+  { return {type: 'IfStatement', test:test, consequent: consequent}; }
+
+WhileStatement
+  = "while"i _ "(" _ test:BooleanExpression _ ")" _ body:Body
+  { return {type: 'WhileStatement', test: test, body: body}; }
+
+BooleanOperator
+  = BooleanBinaryOperator
+  / BooleanUnaryOperator
+    
+BooleanUnaryOperator
+  = "!"
+
+BooleanBinaryOperator
+  = "&&" / "||" / "===" / "==" / "!=" / "<=" / "<" /  ">=" / ">" /"//" / "\\" / "&"
+  / "isincs" /  "isin" / "iswmcs" / "iswm"
+  / "isnum" / "isletter" / "ison" / "isop" / "ishop" / "isvoice" / "isreg" / "isban"
+  / "isaop" / "isavoice" / "isignore" / "isprotect"
+
+BooleanPrimaryExpression
+  = Identifier
+  / Variable
+  / "(" _ expression:BooleanExpression _ ")" { return expression; }
+  / (![(),] !BooleanOperator .)+ { return {type: 'String', value: trim(text())}; } //, because of $iif
+
+BooleanUnaryExpression
+  = BooleanPrimaryExpression
+  / operator:BooleanUnaryOperator _ argument:BooleanPrimaryExpression
+    { return {type: 'UnaryExpression', operator: operator, argument: argument}; }
+
+BooleanBinaryExpression
+  = head:BooleanUnaryExpression
+  tail:(_ BooleanBinaryOperator _ BooleanBinaryExpression?)*
+  { return buildBinaryExpression(head, tail); }
+
+BooleanExpression
+  = BooleanBinaryExpression
+
+ArgChar
+  = Parentesis
+  / ![ ,)\n] .
+
+ArgToken
+  = Identifier
+  / Variable
+  / ArgChar+ { return {type: 'String', value: text()}; }
+  
+Parentesis
+  = '(' arg:Argument ')' { return {type: 'Parentesis', value:arg}; }
+
+// restricted to argument
+Argument "Argument"
+  = head:ArgToken tail:(__ ArgToken)* { return buildList(head, tail, 1); }
+
+ArgumentList "Argument List"
+  = head:Argument tail:(_ "," _ Argument)* { return buildList(head, tail, 3); }
+
+IdentifierProp
+  = "." prop:[a-zA-Z]+ { return prop.join(""); }
+
+IdentifierName "IdentifierName"
+  = (![ ,\n()] .)* { return text(); }
+
+Identifier "Identifier"
+  = "$iif(" _ test:BooleanExpression _ args:("," _ ArgumentList _)? ")"
+  { return {type: 'Identifier', name: "iif", args: args && args[2] ? [test].concat(args[2]) : [test], source: text()}; }
+  / "$" name:IdentifierName args:("(" _ ArgumentList? _ ")")? prop:IdentifierProp? {
+  return {type: 'Identifier', name: name, args: args && args[2], prop: prop, source: text()}; }
+  / "#" prop:IdentifierProp? {return {type: 'Identifier', name: chan, prop: prop, source: text()}; }
+
+Variable
+  = "%" name:IdentifierName { return {type: 'Variable', name: name}; }
+
+VariableDeclaration
+  = "var"i __ "%" name:IdentifierName _ value:("=" _ Argument)?
+  { return  {type: 'VariableDeclaration', name: name, value: value && value[2], local: true}; }
+  / "set"i __ "%" name:IdentifierName _ init:("=" _ Argument)?
+  { return  {type: 'VariableDeclaration', name: name, value: value && value[2], local: false}; }
+
+VariableAssignment
+  = "%" name:IdentifierName _ "=" _ value:Argument
+  { return {type: 'VariableAssignment', name: name, value: value}; }
+
+VariableIncrement
+  = "inc" __ "%" name:IdentifierName inc:(__ value:Argument)?
+  { return {type: 'VariableIncrement', name: name, inc: inc && inc[1]}; }
+VariableDecrement
+  = "dec" __ "%" name:IdentifierName dec:(__ value:Argument)?
+  { return {type: 'VariableDecrement', name: name, dec: dec && dec[1]}; }
+
+Glue = (_ ("$+" __)+)*
+Glue$ = (__ "$+" _ !.)?
+    nl "NewLine" = [\n]
+_ "WhiteSpace"  = [ \t]*
+__ "WhiteSpace" = [ \t]+

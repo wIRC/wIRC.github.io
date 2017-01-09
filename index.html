@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <link rel="stylesheet" type="text/css" href="styles.css" />
+        <script src="contextMenu/jquery-1.8.2.min.js" type="text/javascript"></script>
+        <script src="contextMenu/src/jquery.ui.position.js" type="text/javascript"></script>
+        <script src="contextMenu/src/jquery.contextMenu.js" type="text/javascript"></script>
+        <script src="mibbit.js" charset="UTF-8"></script>
+        <script src="conf.js" charset="UTF-8"></script>
+        <script src="BS.js" charset="UTF-8"></script>
+        <script src="popups.js" charset="UTF-8" async></script>
+        <script src="aliases.js" charset="UTF-8" async></script>
+        <script src="mircscript/parser.js" charset="UTF-8"></script>
+        <script src="mircscript/mircscript.js" charset="UTF-8"></script>
+        <link href="contextMenu/src/jquery.contextMenu.css" rel="stylesheet" type="text/css" />
+        <title>wIRC</title>
+    </head>
+
+    <body>
+        <audio src="beep.mp3" id="beep"></audio>
+        <table width="100%" class="table" style="height: 100%;">
+            <tr class="title">
+                <td class="buttons"><button id="settingsButton"><img src="options.png" /></button></td>
+                <td class="title" id="title" colspan="2"></td>
+            </tr>
+            <tr style="height: 100%; vertical-align: top">
+                <td id="switchbar" rowspan="2"></td>
+                <td style="width: 99%">
+                    <div id="scrollbox"></div>
+                </td>
+                <td>
+                    <div id="nicklist"></div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" align="center">
+                    <form onsubmit="return false;" action="./" method="post">
+                        <table style="width: 100%">
+                            <tr>
+                                <td id="editboxes">
+                                    <input type="submit" value="Send" style="display:none;" />
+                                </td>
+                                <!--<td style="width:62px; text-align: right"><input type="submit" style="width:60px;" value="Send" /></td>-->
+                            </tr>
+                        </table>
+                    </form>
+                </td>
+            </tr>
+        </table>
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <p>Your script:</p>
+                <textarea rows="12" id="userScript"></textarea><br />
+                <p>
+                    <a id="downloadBackup" target="_blank" download="wIRC-backup.json">Download settings backup.</a>
+                    <a onclick="document.getElementById('restoreBackup').click();" href="javascript:">Restore settings from file.</a>
+                    <input type="file" id="restoreBackup" style="display: none;" />
+                </p>
+                <button id="settingsOkButton">OK</button>
+                <button id="settingsApplyButton">Apply</button>
+                <button id="settingsCancelButton">Cancel</button>
+            </div>
+        </div>
+    </body>
+</html>

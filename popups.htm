@@ -1,0 +1,379 @@
+<!-- <textarea id="popups" rows="20" style="width:100%">
+$server: lusers
+-
+Commands
+.Info
+..Admin information: ADMIN
+..Server information: INFO
+..Lusers: LUSERS
+..MOTD: MOTD
+..Server Time: TIME
+.Server statistics
+..View link blocks	c: .raw STATS c
+..View e-lines (local ban exemptions)	e: .raw STATS e
+..View g-lines (global bans)	g: .raw STATS g
+..View k-lines (local bans)	k: .raw STATS k
+..View all client connections with information and host	l: .raw STATS l
+..View all client connections with information and IP address	L: .raw STATS L
+..View command statistics, number of times commands have been used	m: .raw STATS m
+..View a list of all valid oper usernames and hostmasks	o: .raw STATS o
+..View q-lines (nick mask bans)	q: .raw STATS q
+..View server uptime	u: .raw STATS u
+..View filter definitions	s: .raw STATS s
+..View bandwidth/socket statistics	T: .raw STATS T
+..View connect class permissions	I: .raw STATS I
+..View online opers and their idle times	P: .raw STATS P
+..View open client ports, and the port type (ssl, plaintext, etc) plus number of users on each port	p: .raw STATS p
+..View u-lined servers	U: .raw STATS U
+..View connection classes	Y: .raw STATS Y
+..View memory usage statistics	z: .raw STATS z
+..View z-lines (ip mask bans)	Z: .raw STATS Z
+.-
+.Change nick...: NICK $$input(New nick?,qe,Change nick)
+.-
+.Join channel...: JOIN #$$input(What channel do you want to join?,qe,Join channel)
+.List channels
+..All: LIST
+..Search...: LIST $$input(What channel name pattern?,qe,List channels,*)
+.-
+.View Userhost...: USERHOST $input(What nickname do you want to view its userhost?,qe,View userhost)
+.Search users
+..IRC operators
+...All: WHO * ouh
+...By nick...: WHO $input(What nickname pattern?,qe,Search IRC operators) ouh
+...By realname...: WHO $input(What realname pattern?,qe,Search IRC operators) oruh
+...By modes...: WHO $input(What modes?,qe,Search IRC operators) omuh
+..All
+...All: WHO * uh
+...By nick...: WHO $input(What nickname pattern?,qe,Search users) uh
+...By realname...: WHO $input(What realname pattern?,qe,Search users) ruh
+...By modes...: WHO $input(What modes?,qe,Search users) muh
+..-
+..Custom...: WHO $input(Search pattern?,qe) $input(Flags?,qe)
+.Whois user...: WHOIS $input(What nickname do you wanto do whois?,qe,Whois user)
+.Whowas user...: WHOWAS $input(What nickname do you wanto do whowas?,qe,Whowas user)
+UserModes
+.$me $usermode: mode $me
+.-
+.$iif(i isincs $usermode,$style(1)) Invisible	i: MODE $me $iif(i isincs $usermode,-,+) $+ i
+.$iif(s isincs $usermode,$style(1)) Receive server notices	s: MODE $me $iif(s isincs $usermode,-,+) $+ s
+.$iif(w isincs $usermode,$style(1)) Receive WALLOPS	w: MODE $me $iif(w isincs $usermode,-,+) $+ w
+.$iif(B isincs $usermode,$style(1)) Marked as being a bot	B: MODE $me $iif(B isincs $usermode,-,+) $+ B
+.$iif(R isincs $usermode,$style(1)) Only allow registered and identified users to message you	R: MODE $me $iif(R isincs $usermode,-,+) $+ R
+.$iif(S isincs $usermode,$style(1)) Strips colour from private messages	S: MODE $me $iif(S isincs $usermode,-,+) $+ S
+.$iif(W isincs $usermode,$style(1)) Receive a notification when WHOISed	W: MODE $me $iif(W isincs $usermode,-,+) $+ W
+.$iif(x isincs $usermode,$style(1)) Mask your hostname	x: MODE $me $iif(x isincs $usermode,-,+) $+ x
+.-
+.Set custom usermodes...: MODE $me $$input(What modes?,qe,Set custom usermodes)
+-
+NickServ
+.Register nick...: $null
+.Login...: NICKSERV identify $input(What is account you want to login?,qe,Login,$me) $$input(What is your account password?,qep,Login)
+.Logout: NICKSERV logout
+.Drop account...: NICKSERV drop $$input(What is the account you want to drop?,qe) $$input(What is the account password?,qe,Drop account)
+.-
+.Ghost nickname...: NICKSERV ghost $$input(What is the target nickname you want to ghost?,qe,Ghost nickname) $input(What is the account password? $+ $str($crlf,2) $+ This is optional if you are logged in on that account.,qep,Ghost nickname)
+.Release nickname...: NICKSERV release $$input(What is the target nickname you want to release?,qe,Release nickname) $input(What is the account password? $+ $str($crlf,2) $+ This is optional if you are logged in on that account.,qep,Release nickname)
+.-
+.Group
+..Add ' $+ $me $+ ' to your account: NICKSERV group
+..Remove ' $+ $me $+ ' from your account: NICKSERV ungroup
+.-
+.Display account information...: NICKSERV info $input(What is the account you want to display information? $+ $str($crlf,2) $+ A = behind a nickname will display the information of the account wich that nickname is logged in.,qe,Display account information,= $+ $me)
+.List your channel access: NICKSERV listchans
+.-
+.Your account settings
+..Change e-mail...: NICKSERV set email $$input(What is the new e-mail for your account?,qe,Change e-mail)
+..Change password...: NICKSERV set password $input(What is the new password for your account?,qe,Change password)
+..-
+..Memo receiving
+...Enable: NICKSERV set nomemo on
+...Disable: NICKSERV set nomemo off
+...-
+...Help: NICKSERV help set nomemo
+..Receive memos by email
+...Enable: NICKSERV set emailmemos on
+...Disable: NICKSERV set emailmemos off
+...-
+...Help: NICKSERV help set emailmemos
+..Protect your nicknames
+...Enable: NICKSERV set enforce on
+...Disable: NICKSERV set enforce off
+...-
+...Help: NICKSERV help set enforce
+..Hide your e-mail from info
+...Enable: NICKSERV set hidemail on
+...Disable: NICKSERV set hidemail off
+...-
+...Help: NICKSERV help set hidemail
+..Prevent from receiving channel access
+...Enable: NICKSERV set neverop on
+...Disable: NICKSERV set neverop off
+...-
+...Help: NICKSERV help set neverop
+..Prevent from receiving op on join
+...Enable: NICKSERV set noop on
+...Disable: NICKSERV set noop off
+...-
+...Help: NICKSERV help set noop
+..-
+..Channel status notification
+...Enable: NICKSERV set QUIETCHG off
+...Disable: NICKSERV set QUIETCHG on
+...-
+...Help: NICKSERV help set QUIETCHG
+..Nickserv messaging
+...Receive messages from Nickserv by Notice: NICKSERV set privmsg off
+...Receive messages from Nickserv by Private Message: NICKSERV set privmsg on
+...-
+...Help: NICKSERV help set privmsg
+..Hide private information
+...Enable: NICKSERV set private on
+...Disable: NICKSERV set private off
+...-
+...Help: NICKSERV help set private
+..-
+..Change account name...: NICKSERV SET accountname $$input(What is the new account name for your account?,qe,Change account name)
+..Edit metadata...: NICKSERV set property $$input(What is the property you want to change?,qe,Edit metadata) $input(What is the value you want to set to this property?,qe,Edit metadata)
+..-
+..Help: NICKSERV help set
+.-
+.Access list
+..Add...: NICKSERV access add $$input(What is the mask you want to add to your access list?,qe,Access list)
+..Del...: NICKSERV access del $$input(What is the mask you want to remove your access list?,qe,Access list)
+..-
+..List your access list: NICKSERV access list
+..-
+..Help: NICKSERV help access
+.Display account login status...: NICKSERV acc $$input(What is the account you want to see the login status?,qe,Display account login status,$me)
+.Display your status: NICKSERV status
+.Display account metadata...: NICKSERV taxonomy $$input(What is the account you want to display metadata?,qe,Display account metadata)
+.-
+.Help
+..List all Nickserv commands: NICKSERV help
+..Get help about a command...: NICKSERV help $input(What is the command you want to get help?,qe,Help)
+ChanServ
+.Request invite...: CHANSERV invite #$$input(What is the channel you want to be invited?,qe,Request invite)
+.Get key...: CHANSERV getkey #$$input(What is the channel you want to know the key?,qe,Get key)
+.-
+.Recover...: CHANSERV recover #$$input(What is the channel you want to recover?,qe,Recover)
+.-
+.Display your status...: CHANSERV status #$$input(What is the channel you want to display your status?,qe,Display your status)
+.Display information...: CHANSERV info #$$input(What is the channel you want to display information?,qe,Display information)
+.Display metadata...: CHANSERV taxonomy #$$input(What is the channel you want to display the metadata?,qe,Display metadata)
+MemoServ
+.Read
+..Read new memos: MEMOSERV read new
+..Read a memo...: MEMOSERV read $$input(What is the memo number?,qe,Read a memo)
+.Delete
+..Delete all memos: MEMOSERV delete all
+..Delete a memo...: MEMOSERV delete $$input(What is the memo number?,qe,Delete a memo)
+.-
+.List your memos: MEMOSERV list
+.-
+.Send a memo...: MEMOSERV send $$input(What is the destination account?,qe,Send a memo) $$input(What is the message?,qe,Send a memo)
+.Forward a memo...: MEMOSERV forward $$input(What is the destination account?,qe,Forward a memo) $$input(What is the memo number?,qe,Forward a memo)
+.-
+.Ignore user
+..Add...: MEMOSERV ignore add $input(What is the account you want to ignore?,qe,Ignore)
+..Del...: MEMOSERV ignore del $input(What is the account you want to unignore?,qe,Ignore)
+..-
+..Clear: MEMOSERV ignore clear
+-
+IRC Operator
+.NickServ
+..Freeze account
+...On...: NICKSERV freeze $$input(What is the account you want do freeze?,qe,Freeze account) on
+...Off...: NICKSERV freeze $$input(What is the account you want to unfreeze?,qe,Freeze account) off
+..Drop account...: NICKSERV fdrop $$input(What is the account you want to forcefully drop?,qe,Force drop)
+..Ungroup nickname...: NICKSERV fungroup $$input(What is the nickname you want to forcefully ungroup from its account?,qe,Force ungroup)
+..Verify account...: NICKSERV fverify $$input(What is the operation you want to forcefully verify?,qe) $input(What is the account you want to forcefully verify the operation?,qe,Force verify) 
+..Hold account
+...On...: NICKSERV hold $$input(What account do you want to prevent from expiring?,qe,Hold) on
+...Off...: NICKSERV hold $$input(What account do you want to unprevent from expiring?,qe,Hold) off
+..List accounts
+...By nickname...: NICKSERV list $$input(What is the nickname pattern?,qe,List accounts,*)
+...By hostname...: NICKSERV list $$input(What is the hostname pattern?,qe,List accounts,*!*@*)
+...By e-mail...: NICKSERV listmail $$input(What is the e-mail pattern?,qe,List accounts,*@*)
+...By virtual host...: NICKSERV listvhost $$input(What is the virtual host pattern?,qe,List accounts,*)
+..Mark account...: NICKSERV mark $$input(What is the account you want to mark?,qe,Mark account) $iif($input(What is the reason you want to mark?,qe,Mark account),ON $ifmatch,OFF)
+..Reset account password...: NICKSERV resetpass $input(What is the account you want to reset password?,qe,Reset password)
+..Return account...: NICKSERV return $input(What is the account you want to reset password and e-mail?,qe,Return account) $$input(What is the new e-mail for this account? $+ $str($crlf,2) $+ The new password will be sent to this e-mail.,qe,Return account)
+..Send account password...: NICKSERV sendpass $$input(What is the account you want to send a key to its e-mail?,qe,Send password)
+..Edit account vhost...: NICKSERV vhost $$input(What is the account you want to edit vhost?,qe) $iif($input(What is the new vhost for this account?,qe,Edit vhost),ON $ifmatch,OFF)
+.OperServ
+..Auto-kill list
+...Add...: OPERSERV akill add $$input(What is the nickname or hostmask you want to add to auto-kill list?,qe,Auto-kill list) $iif($$input(Do you want this to be permanent?,qy,Auto-kill list),!P,!T $$input(How many minutes it may last?,qe,Auto-kill list))
+...Del...: OPERSERV akill del $$input(What is the nickname or hostmask you want to remove from auto-kill list?,qe,Auto-kill list)
+...-
+...Display list: OPERSERV akill list
+...Display full list: OPERSERV akill list full
+...-
+...Sync: OPERSERV akill sync
+..Ignore list
+...Add...: OPERSERV ignore add $$input(What is the hostname mask you want to add to Operserv ignore list?,qe,OperServ ignore list) $$input(What is the reason?,qe,OperServ ignore list)
+...Del...: OPERSERV ignore del $$input(What is the hostname mask you want to remove from Operserv ignore list?,qe,OperServ ignore list)
+...-
+...Display list: OPERSERV ignore list
+...Clear list: OPERSERV ignore clear
+.GlobalServ
+..Add line to current message and send...: {
+GLOBALSERV global add $$input(What is the message?,qe,GlobalServ)
+GLOBALSERV global send
+}
+..Add line to current message...: GLOBALSERV global add $$input(What is the message?,qe,GlobalServ)
+..Send message: GLOBALSERV global send
+..-
+..Clear current message: GLOBALSERV global clear
+.-
+.Oper login...: OPER $input(Login?,qe) $input(Password?,qep)
+.-
+.Ban Channel...: CBAN $bs.input.chan : $+ $input(Reason?,qe)
+.-
+.Lock nick
+..Lock...: NICKLOCK $input(Nick?,qe)
+..Unlock...: NICKUNLOCK $input(Nick?,qe)
+.Sa(...)
+..Sajoin...: SAJOIN $input(Nickname?,qe) $input(Channel?,qe)
+..Samode...: SAMODE $input(Target?,qe) $input(Modes?,qe)
+..Sanick...: SANICK $input(Nickname?,qe) $input(New nickname?,qe)
+..Sapart...: SAPART $input(Nickname?,qe) $input(Channel?,qe)
+..Saquit...: SAQUIT $input(Nickname?,qe) $input(Quit message?,qe)
+.Display user IP...: USERIP $input(Nickame?,qe)
+.-
+.Kill user...: KILL $input(Nickname?,qe) $input(What reason?,qe,Kill)
+.-
+.(...)line
+..Kline...: KLINE $input(User@Host?,qe,Kline) $input([duration][y|w|d|h|m|s],qe,Kline) : $+ $input(What reason?,qe,Kline)
+..Zline...: ZLINE $input(Ipmask?,qe,Zline) $input([duration][y|w|d|h|m|s],qe,Zline) : $+ $input(What reason?,qe,Zline)
+..Qline...: QLINE $input(Nickmask?,qe,Qline) $input([duration][y|w|d|h|m|s],qe,Qline) : $+ $input(What reason?,qe,Qline)
+..Gline...: GLINE $input(User@Host?,qe,Gline) $input([duration][y|w|d|h|m|s],qe,Gline) : $+ $input(What reason?,qe,Gline)
+..Eline...: ELINE $input(User@Host?,qe,Eline) $input([duration][y|w|d|h|m|s],qe,Eline) : $+ $input(What reason?,qe,Eline)
+-
+Quit IRC: QUIT
+</textarea> -->
+<textarea id="popups" rows="20" style="width:100%">
+$1 $+ ...: uwho $1
+-
+Whois: WHOIS $1
+-
+NickServ
+MemoServ
+-
+IRC Operator
+.NickServ
+.OperServ
+.-
+.Lock nick
+..Lock: NICKLOCK $1
+..Unlock: NICKUNLOCK $1
+.Sa(...)
+..Sajoin: SAJOIN $1 $input(Channel?,qe)
+..Samode: SAMODE $1 $input(Modes?,qe)
+..Sanick: SANICK $1 $input(New nick?,qe)
+..Sapart: SAPART $1 $input(Channel?,qe)
+..Saquit: SAQUIT $1 $input(Message?,qe)
+.UserIP: USERIP $1
+.-
+.Kill: KILL $1 $input(What reason?,qe,Kill)
+.-
+.(...)line
+..Kline: KLINE $input(User@Host?,qe,Kline) $input([duration][y|w|d|h|m|s],qe,Kline) : $+ $input(What reason?,qe,Kline)
+..Zline: ZLINE $input(Ipmask?,qe,Zline) $input([duration][y|w|d|h|m|s],qe,Zline) : $+ $input(What reason?,qe,Zline)
+..Qline: QLINE $input(Nickmask?,qe,Qline) $input([duration][y|w|d|h|m|s],qe,Qline) : $+ $input(What reason?,qe,Qline)
+..Gline: GLINE $input(User@Host?,qe,Gline) $input([duration][y|w|d|h|m|s],qe,Gline) : $+ $input(What reason?,qe,Gline)
+..Eline: ELINE $input(User@Host?,qe,Eline) $input([duration][y|w|d|h|m|s],qe,Eline) : $+ $input(What reason?,qe,Eline)
+-
+Message
+.Send a private message to all open PVT's	/qmsg: qmsg $$input(What message?,qe)
+.Send a private message to all open PVT's on all servers: scon -at1 qmsg $$input(What message?,qe)
+Action
+.Send an action to $1	/me: describe $1 $$input(What action?,qe)
+.Send an action to all PVT's	/qme: qme $$input(What action?,qe)
+.Send an action to all PVT's on all servers: scon -at1 qme $$input(What action?,qe)
+Notice
+.Send a notice to $1	/notice: notice $1 $$input(What notice?,qe)
+.Send a notice to all PVT's	/qnotice: qnotice $$input(What notice?,qe)
+.Send a notice to all PVT's on all servers: scon -at1 qnotice $$input(What notice?,qe)
+CTCP
+.Ping: ctcp $1 ping
+.Time: ctcp $1 time
+.Version: ctcp $1 version
+.Source: ctcp $1 source
+.-
+.Page: ctcp $1 page $$input(What msg?,eq,CTCP Page)
+.-
+.Finger: ctcp $1 finger
+.Userinfo: ctcp $1 userinfo
+.Clientinfo: ctcp $1 clientinfo
+.Sound: ctcp $1 sound
+.-
+.OS: ctcp $1 os
+.Theme: ctcp $1 theme
+.-
+.Other	/ctcp: ctcp $1 $$input(What CTCP?,eq,CTCP)
+DCC
+.Send:/dcc send $1
+.Chat:/dcc chat $1
+-
+$iif($notify($1),$style(1)) Notify: notify $iif($notify($1),-r) $1
+$iif($ignore($address($1,2)),$style(1)) Ignore: ignore $iif($ignore($address($1,2)),-r) $1 2
+$iif($isfile(logs\ $+ $mklogfn($1)),View private log...): run logs\ $+ $mklogfn($1)
+-
+Clear
+.Clear current window: clear
+.Clear all windows: clearall
+Close
+.Close all PVT's	/close -m: close -m
+.Close all PVT's in all servers: scon -a close -m
+-
+Slap!:/slap $1 around a bit with a large trout
+</textarea>
+<input type="button" onclick="parse()" value="Parse!" />
+<script>
+function parse() {
+    var popups = document.getElementById('popups');
+    var text = popups.value;
+    text = text.replace(/^\s*(.+)\s*\r?\n/g, "$1\n")
+    text = text.replace(/\{([^]+?)\}/g, function (match, block) {
+        return block.replace(/\n/g, ' || ');
+    });
+    var nslines  = text.split("\n");
+    
+    var lastlevel = 0;
+    var lastelem = null;
+    var items = {};
+    var queue = [items];
+    var seps = 0;
+    for (var i = 0; i < nslines.length; i++) {
+        var line = nslines[i].replace(/^\s+|\s+$/, '');
+        console.log('Parsing line #' + i + ': ' + line);
+        var match = line.match(/(\.*)([^:]+)(?:\s*:\s*(.+))?/);
+        if (match) {
+            var level = match[1].length;
+            console.log('level:', lastlevel + ' -> ' + level, 'queue:', queue);
+            var label = match[2];
+            var cmd = match[3];
+            // console.log(match);
+            if (level > lastlevel) {
+                lastlevel = level;
+                queue.unshift(lastelem.items = {});
+            }
+            else if (level < lastlevel) {
+                while (lastlevel > level) {
+                    lastlevel--;
+                    queue.shift();
+                }
+            }
+            if (label == '-') lastelem = queue[0]['sep' + seps++] = "";
+            else lastelem = queue[0][label.replace(/[^a-z]/gi, '').toLowerCase()] = {name: 'FUNC#BS.server.eval(\'' + label.replace(/'/g, '') + '\', {tokens: tokens})#FUNC'};
+            if (cmd) {
+                lastelem.callback = 'FUNC#function () { BS.server.call(BS.server.eval(\'' + cmd.replace(/'/g, '') + '\', {tokens: tokens})); }#FUNC';
+            }
+        }
+        //else console.log('No match: ' + line);
+        
+    }
+    popups.value = JSON.stringify(items, null, 4).replace(/"FUNC#|#FUNC"/g, '');
+}
+</script>
