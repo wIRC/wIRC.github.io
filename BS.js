@@ -530,10 +530,10 @@ function BSServer(hostname, port, init) {
     this.me = null;
     this.nick = (BSConf.nick || (
             function () {
-                var hostname = BSConf.hostname.split('.').slice(-2, -1)[0];
-                return hostname.slice(0, 1).toUpperCase() + hostname.slice(1, 4).toLowerCase();
+                var domain = hostname.split('.').slice(-2, -1)[0];
+                return domain.slice(0, 1).toUpperCase() + domain.slice(1, 4).toLowerCase();
             }
-        )()) + BS.util.rand(100, 999);
+        )()) + BS.util.rand(10000, 99999);
     this.password = '';
     this.chans = {};
     this.queries = {};
