@@ -2,6 +2,6 @@ var BSConf = {
     version: 'wIRC Web Client (v0.1) - https://github.com/dppmm/wIRC',
     hostname: 'magnet.rizon.net',
     port: '+6697',
-    chan: ['#chat'],
-    nick: 'wIRC'
+    chans: ['#chat'],
+    nick: ''
 };

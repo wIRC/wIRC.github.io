@@ -9,7 +9,7 @@ var MB = {
     },
     connect: function (server, forced) {
         MB.servers[server.hostname] = server;
-        var data = {"channel": "IRCClient", "cmd": "connect", "data": server.hostname + ":" + server.port, "nick": server.nick, "pass": "", "authmethod": "nickserv", "joinchannels": "", "charset": "UTF-8"};
+        var data = {"channel": "IRCClient", "cmd": "connect", "data": server.hostname + ":" + server.port, "nick": server.nick, "pass": server.password || '', "authmethod": "nickserv", "joinchannels": "", "charset": "UTF-8"};
         data.forced = true; // if (forced) data.forced = true;
         MB.send(data);
         clearInterval(MB.pingTimer);
@@ -18,10 +18,13 @@ var MB = {
         }, 120000);
     },
     connectSocket: function () {
+        BS.log('Opening WebSocket...', MB.socket, MB.socket && MB.socket.readyState);
+        if (MB.socket && MB.socket.readyState < 2) return;
         MB.socket = new WebSocket(MB.url);
         MB.socket.onopen = MB.onOpen;
         MB.socket.onmessage = MB.onMessage;
         MB.socket.onclose = MB.onClose;
+        MB.socket.onerror = MB.onError;
     },
     disconnect: function () {
         MB.socket.close();
@@ -35,7 +38,10 @@ var MB = {
             switch (data.cmd.toUpperCase()) {
                 case 'CONNECTED': return MB.servers[data.name].network = data.network;
                 case 'CHECKCONNECT': return setTimeout(function () { MB.connect(MB.servers[data.name], true); }, 1000);
-                case 'DISCONNECTED': return setTimeout(function () { MB.connect(MB.servers[data.name], true); }, 1000);
+                case 'DISCONNECTED': {
+                    server.event('DISCONNECT', {text: 'disconnected from IRC server'});
+                    return setTimeout(function () { MB.connect(MB.servers[data.name], true); }, 1000);
+                }
                 case 'NICKPROMPT': {
                     server.alias('RAW', 'NICK ' + server.nick + BS.util.rand(100, 999));
                     break;
@@ -57,13 +63,22 @@ var MB = {
                     server.switchbar.newMsg(data.localchannel);
                     break;
                 }
+                case 'MOTD': break;
                 case 'EMOTE': {
                     server.event('ACTION', {chan: server.getChan(data.localchannel) && data.localchannel, nick: data.nick, text: data.emote});
                     server.switchbar.newMsg(data.localchannel);
                     break;
                 }
                 case 'NOTICE': return server.event('NOTICE', {chan: server.getChan(data.localchannel) && data.localchannel, nick: data.nick, text: data.notice});
-                case 'TOPIC': return server.proc.raw332(data.localchannel, data.topic);
+                case 'AWAY': return server.event('RAW', {command: '301', params: data.nick, trailing: data.reason});
+                case 'BAN': return server.event('RAW', {command: 'MODE', prefix: data.by, params: channel[2] + ' +b ' + data.nick});
+                case 'UNBAN': return server.event('RAW', {command: 'MODE', prefix: data.by, params: channel[2] + ' -b ' + data.nick});
+                case 'MODE': return server.event('RAW', {command: 'MODE', prefix: data.nick, params: data.localchannel + ' ' + data.msg.slice(-2)});
+                case 'TOPIC': {
+                    if (data.nick) return server.event('RAW', {command: 'TOPIC', prefix: data.nick, params: data.localchannel, trailing: data.topic});
+                    return server.event('RAW', {command: '332', params: server.ident.me() + ' ' + data.localchannel, trailing: data.topic});
+                }
+                case 'TOPICWHO': return server.event('RAW', {command: '333', params: [server.ident.me(), data.localchannel, data.creator, data.date].join(' ')});
                 case 'WHOISREPLY': {
                     server.event('RAW', {command: '311', params: server.ident.me() + ' ' + data.nick + ' ' + data.user + ' ' + data.host + ' *', trailing: data.realname});
                     server.event('RAW', {command: '312', params: server.ident.me() + ' ' + data.nick + ' ' + data.server, trailing: data.serverinfo});
@@ -108,6 +123,14 @@ var MB = {
                     server.event('RAW', {raw: line, prefix: prefix, command: command, params: params, trailing: ''});
                     break;
                 }
+                case 'SERVERSTATUS': break;
+                case 'USERINFO': break;
+                case 'STATUS': break;
+                case 'LAGTIME': break;
+                case 'NPING': break;
+                default: {
+                    server.event('RAW', {raw: '', prefix: '', command: data.cmd.toUpperCase(), params: '', trailing: JSON.stringify(data)});
+                }
             }
         }
         if (data.sessionid) {
@@ -139,10 +162,15 @@ var MB = {
 //        else BS.log('cannot parse: "' + line + '"');
 //    },
     onClose: function () {
-        for (var i in BS.servers) BS.servers[i].event('DISCONNECT');
-        setTimeout(MB.connectSocket, 1000);
+        for (var i in BS.servers) BS.servers[i].event('DISCONNECT', {text: 'socket closed'});
+        MB.connectSocket();
+    },
+    onError: function () {
+        for (var i in BS.servers) BS.servers[i].event('DISCONNECT', {text: 'socket error'});
+        MB.connectSocket();
     },
     onOpen: function () {
+        BS.log('WebSocket open.');
         //BS.server.alias('RAW', "NICK " + BS.sets.get('nick'));
         //BS.server.alias('RAW', "USER " + BS.sets.get('nick') + " server.com server.com : " + BS.sets.get('nick'));
     },
@@ -167,14 +195,18 @@ var MB = {
     },
     send: function (data) {
         data.seq = MB.seq++;
-        MB.sendData(data);
+        return MB.sendData(data);
     },
     sendData: function (data) {
         console.log('->', data);
-        if (MB.socket && MB.socket.readyState == MB.socket.OPEN) MB.socket.send(JSON.stringify(data));
+        if (MB.socket && MB.socket.readyState == MB.socket.OPEN) {
+            MB.socket.send(JSON.stringify(data));
+            return true;
+        }
         else {
             BS.UI.echo("* Not connected."); //fixme: should be shown in server's window
-            MB.init();
+            MB.connectSocket();
+            return false;
         }
     }
 };

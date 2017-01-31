@@ -4,6 +4,7 @@ BSIdent.prototype.false = function () { return false; };
 BSIdent.prototype.iif = function (a, b, c) { return (eval(BSParser.parseBooleanExpressionSource(a)) ? b : c) || ''; }; // todo: this is ugly
 BSIdent.prototype.idle = function () { return Math.round((Date.now() - this.server.lastInputTime) / 1000); };
 BSIdent.prototype.serverIdent = function () { return this.server.hostname; };
+BSIdent.prototype.pow = function (n, p) { return Math.pow(n, p); };
 
 // Text and Number Identifiers
 BSIdent.prototype.abs = function (n) { return Math.abs(n); };

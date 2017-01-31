@@ -53,7 +53,7 @@ EventType3 = "text"i / "action"i / "notice"i
 Event
   = "on"i __ level:EventToken _ ":" _ name:EventType1 _ ":" _ body:Body
   { return {type: 'Event', level: level, name: name, body: body} }
-  / "on"i __ level:EventToken _ ":" _ name:EventType2 _ ":" _ text:EventToken _ ":" _ body:Body
+  / "on"i __ level:EventToken _ ":" _ name:EventType2 _ ":" _ target:EventToken _ ":" _ body:Body
   { return {type: 'Event', level: level, name: name, target: target, body: body} }
   / "on"i __ level:EventToken _ ":" _ name:EventType3 _ ":" _ text:EventToken _ ":" _ target:EventToken _ ":" _ body:Body
   { return {type: 'Event', level: level, name: name, text: text, target: target, body: body} }

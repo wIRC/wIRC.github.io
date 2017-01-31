@@ -8,6 +8,8 @@ var BS = {
     onLoad: function () {
         //init
         BS.logs = new BSLogger();
+        BS.plogs = new BSPLogger();
+        setInterval(function () { BS.plogs.store(); }, 30000);
         //restore state
         var active;
         var state = BS.sets.get('state');
@@ -15,10 +17,14 @@ var BS = {
             BS.log('Restoring state:', state);
             for (var i = 0; i < state.servers.length; i++) {
                 var serverState = state.servers[i];
-                var server = new BSServer(serverState.hostname, serverState.port);
-                server.nick = serverState.nick;
-                server.login = serverState.login;
-                server.network = serverState.network;
+                var server = new BSServer(serverState.hostname, serverState.port,
+                    {
+                        nick: serverState.nick,
+                        login: serverState.login,
+                        network: serverState.network,
+                        password: serverState.password
+                    }
+                );
                 for (var j = 0; j < serverState.chans.length; j++) server.addChan(serverState.chans[j]);
                 for (var j = 0; j < serverState.queries.length; j++) server.addQuery(serverState.queries[j]);
                 if (serverState.active) active = server.getWindow(serverState.active);
@@ -36,6 +42,7 @@ var BS = {
         //<url>#nick,#chan1,#chan2,...,#chanN
         var regs = location.hash.match(/^#?(.+)$/);
         if (regs) {
+            location.hash = '';
             BS.log('Loading URL params: ' + regs[1]);
             var chans = [], nick, hostname, port;
             var tokens = regs[1].split(',');
@@ -46,7 +53,7 @@ var BS = {
                 else if (/^\+?\d+$/.test(token)) port = token;
                 else nick = token;
             }
-            
+
             //we won't connect again if there is a similar connection (from the saved state)
             var similarConnFound = false;
             for (var i in BS.servers) {
@@ -69,7 +76,7 @@ var BS = {
         if (!BS.cid) {
             BS.log('Loading default server.');
             var server = new BSServer();
-            for (var i in BSConf.chans) server.addChan(BSConf.chans[i]);
+            for (var i = 0; i < BSConf.chans.length; i++) server.addChan(BSConf.chans[i]);
         }
 
         //restore active window
@@ -136,7 +143,7 @@ var BS = {
         settingsButton.onclick = function() {
             document.getElementById('userScript').value = sets.userScript;
             var downloadBackup = document.getElementById('downloadBackup');
-            if (!downloadBackup.href) downloadBackup.href = BS.sets.backup();
+            downloadBackup.href = BS.sets.backup();
             modal.style.display = "block";
         };
         var settingOkButtonCallback = function (close) {
@@ -188,7 +195,16 @@ alias hi say Hi $1-!
             }
         }, false);
 
+
+
+        document.getElementById('downloadLogs').addEventListener('click', function () {
+            if (confirm("After the download the logs will be deleted.")) {
+                BSPLogger.prototype.download();
+            }
+        });
         addEventListener("beforeunload", BS.onUnload);
+
+
     },
     onUnload: function () {
         for (var i in BS.servers) BS.servers[i].alias('DISCONNECT');
@@ -197,6 +213,7 @@ alias hi say Hi $1-!
         BS.logs.store();
         BS.sets.saveEditboxHistory();
         BS.sets.saveState();
+        BS.plogs.store();
     },
     onReadyToConnect: function () {
         for (var i in BS.servers) MB.connect(BS.servers[i]);
@@ -254,13 +271,18 @@ alias hi say Hi $1-!
                 serverState.port = server.port;
                 serverState.login = server.login;
                 serverState.network = server.network;
+                serverState.password = server.password;
                 servers.push(serverState);
             }
             BS.sets.set('state', {servers: servers});
         },
         backup: function () {
             var sets = {};
-            for (var i in localStorage) if (localStorage.hasOwnProperty(i)) sets[i] = BS.sets.get(i);
+            for (var i in localStorage) {
+                if (localStorage.hasOwnProperty(i)) {
+                    sets[i] = /^plogs_/.test(i) ? localStorage.getItem(i) : BS.sets.get(i);
+                }
+            }
             var file = new File([JSON.stringify(sets)], "wIRC-backup.json", {type: 'application/json'});
             return URL.createObjectURL(file);
         },
@@ -296,23 +318,32 @@ alias hi say Hi $1-!
         join: function (nick, mask, chan) {
             return '15o Join: 07' + nick + ' (15' + mask + '07)15 has joined 07' + chan;
         },
+        joinMe: function (nick, mask, chan) {
+            return '15o 15Now talking on07 ' + chan + '';
+        },
         kick: function (nick, knick, chan, text) {
             return '15o Kick: 07' + knick + ' 15 was kicked by 07' + nick + '15 from 07' + chan + ' (' + text + '07)';
         },
         part: function (nick, chan, text) {
-            return '15o Part: 07' + nick + ' 15has left 07' + chan + '(15' + text + '07)';
+            return '15o Part: 07' + nick + ' 15has left 07' + chan + ' (15' + text + '07)';
         },
         quit: function (nick, text) {
             return '15o Quit: 07' + nick + ' 15has left IRC: ' + text;
         },
-        topic: function (topic) {
-            return '15o Topic: ' + topic;
+        'raw.332': function (topic) {
+            return '15o 07Topic15: ' + topic;
         },
-        mode: function (modes) {
-            return '15o Mode: ' + modes;
+        'raw.333': function (nick, time) {
+            return '15o 07Set by15: ' + nick + ' 07on15: ' + BSIdent.prototype.asctime(time);
+        },
+        mode: function (nick, modes) {
+            return '15o Mode: 07' + nick + ' 15sets mode07: ' + modes;
         },
         notice: function (chan, prefix, nick, text) {
             return '15-07' + prefix + nick + (chan ? '15:07' + chan : '') + '15- ' + text;
+        },
+        topic: function (nick, topic) {
+            return '15o Topic: 07' + nick + ' 15changed topic to07: ' + topic;
         },
         usermode: function (modes) {
             return '15o Usermode: ' + modes;
@@ -362,7 +393,7 @@ alias hi say Hi $1-!
             search: function (server, text, nick, chan) {
                 var reg = new RegExp('\\b(' + escapeRegExp(server.ident.me()) + ')(?![a-z0-9_\\-\\[\\]\\\\^{}|`])','i');
                 if (text.match(reg)) {
-                    //text = '<span class="hl">'+text+'</span>';
+                    //text = '<u class="hl">'+text+'</u>';
                     BS.UI.highlight.perform(server, text, nick, chan);
                     text = text.replace(reg, '07$115');
                 }
@@ -408,6 +439,15 @@ alias hi say Hi $1-!
                     }
                 }
             }
+        },
+        updateTitle: function () {
+            var active = BSWindow.active, title = active.label, chan = null;
+            if (active.label == 'Status') title = active.server.network + ' ' + active.server.ident.me();
+            else if (chan = active.server.getChan(active.label)) {
+                title += ' [' + chan.nicks.length + ']';
+                if (chan.topic) title += ': ' + chan.topic;
+            }
+            document.getElementById("title").innerHTML = title;
         }
     },
     util: {
@@ -453,14 +493,19 @@ alias hi say Hi $1-!
         ircformat: function (str) {
             //b k i r o u
             if (!str) return "";
-            str = str.replace(/([^]+)(?:(?=)||$)/g, '<span class="b">$1</span>');
-            str = str.replace(/([^]+)(?:(?=)||$)/g, '<span class="u">$1</span>');
-            str = str.replace(/([^]+)(?:(?=)||$)/g, '<span class="i">$1</span>');
+            str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="b">$1</u>');
+            str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="u">$1</u>');
+            str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="i">$1</u>');
             str = str.replace(/(https?:\/\/)([^ ]+\/?)\b/ig, function (match, p1, p2) {
-              return '<a target="_blank" href="'+ p1 + p2.replace(/[a-z]/ig, function (match) { return '%' + parseInt(match.charCodeAt(0)).toString(16); }) +'">' + match + '</a>';
+                var a = document.createElement('a');
+                a.setAttribute('target', 'blank');
+                a.setAttribute('href', match);
+                a.appendChild(document.createTextNode(match));
+                return a.outerHTML;
+                //return '<a target="_blank" href="'+ p1 + p2.replace(/[a-z]/ig, function (match) { return '%' + parseInt(match.charCodeAt(0)).toString(16); }) +'">' + match + '</a>';
             });
             str = str.replace(/(1[0-5]|0?\d)(?:,(1[0-5]|0?\d))?([^]+)(?:(?=|)|$)/g, function (match, c, bc, text) {
-                return '<span class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</span>';
+                return '<u class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</u>';
             });
             str = str.replace(/|/g, '');
             return str;
@@ -476,14 +521,20 @@ alias hi say Hi $1-!
     }
 };
 
-function BSServer(hostname, port) {
+function BSServer(hostname, port, init) {
     if (!hostname) {
         hostname = BSConf.hostname;
         port = BSConf.port;
     }
     else if (!port) port = '6667';
     this.me = null;
-    this.nick = BSConf.nick + BS.util.rand(100, 999);
+    this.nick = (BSConf.nick || (
+            function () {
+                var hostname = BSConf.hostname.split('.').slice(-2, -1)[0];
+                return hostname.slice(0, 1).toUpperCase() + hostname.slice(1, 4).toLowerCase();
+            }
+        )()) + BS.util.rand(100, 999);
+    this.password = '';
     this.chans = {};
     this.queries = {};
     this.windows = {};
@@ -495,9 +546,12 @@ function BSServer(hostname, port) {
     this.port = port;
     this.network = hostname;
     this.usermode = '';
-    this.login = ''; //current NickServ login
+    this.login = ''; // current NickServ login
+    this.loggingIn = false;
     BS.servers[this.cid = ++BS.cid] = this;
-    //now that everything is set:
+    // after default values, load custom values
+    if (init) for (var i in init) this[i] = init[i];
+    // now that everything is set:
     this.ident = new BSIdent(this);
     this.switchbar = new BSSwitchbar(this);
     this.proc = new BSProc(this);
@@ -585,8 +639,9 @@ BSServer.prototype.onEvent = function (e) {
             break;
         }
         case 'DISCONNECT': {
-            this.alias('ECHO', 'Status', '* Disconnected');
-            for (var i in this.windows) if (/^#/.test(i)) BS.UI.echo('* Disconnected', this.getWindow(i));
+            var msg = '* Disconnected' + (e.text ? ': ' + e.text : '');
+            this.alias('ECHO', 'Status', msg);
+            for (var i in this.windows) if (/^#/.test(i)) BS.UI.echo(msg, this.getWindow(i));
             this.win.button.element.value = 'Status';
             break;
         }
@@ -594,9 +649,15 @@ BSServer.prototype.onEvent = function (e) {
             var chan = e.chan, nick = e.nick, mask = e.mask;
             if (nick == this.ident.me()) {
                 if (!this.getChan(chan)) this.addChan(chan);
+                this.alias('ECHO', chan, '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
+                this.alias('ECHO', chan, BS.theme.joinMe(nick, mask, chan));
+                this.alias('ECHO', chan, '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
             }
-            else this.getChan(chan).addUser(nick);
-            this.alias('ECHO', chan, BS.theme.join(nick, mask, chan));
+            else {
+                this.getChan(chan).addUser(nick);
+                BS.UI.updateTitle();
+                this.alias('ECHO', chan, BS.theme.join(nick, mask, chan));
+            }
             break;
         }
         case 'KICK': {
@@ -630,9 +691,10 @@ BSServer.prototype.onEvent = function (e) {
             break;
         }
         case 'TOPIC': {
-            var chan = e.chan, topic = e.topic;
+            var chan = e.chan, topic = e.topic, nick = e.nick;
             this.getChan(chan).topic = topic;
-            this.alias('ECHO', chan, BS.theme.topic(topic));
+            this.alias('ECHO', chan, BS.theme.topic(nick, topic));
+            BS.UI.updateTitle();
             break;
         }
         case 'NICK': {
@@ -651,10 +713,20 @@ BSServer.prototype.onEvent = function (e) {
                 var pass = BS.sets.getLogin(this.hostname, this.login);
                 if (pass) {
                     this.alias('RAW', 'NICKSERV IDENTIFY ' + (this.login != this.ident.me() ? this.login + ' ' : '') + pass);
+                    this.loggingIn = true;
                 }
             }
-            var chans = BS.util.getObjectKeys(this.chans);
-            if (chans.length) this.alias('RAW', 'JOIN ' + chans.join(','));
+            if (this.loggingIn) {
+                var server = this;
+                setTimeout(function () {
+                    if (server.loggingIn) {
+                        server.loggingIn = false;
+                        BS.log('Login timeout, joining channels anyway.');
+                        server.joinChans();
+                    }
+                }, 2000);
+            }
+            else this.joinChans();
             break;
         }
         case 'RAW': {
@@ -686,7 +758,7 @@ BSServer.prototype.onEvent = function (e) {
                     break;
                 }
                 case 'TOPIC': {
-                    this.event('TOPIC', {chan: params, topic: trailing}, e);
+                    this.event('TOPIC', {nick: this.ident.unmask(prefix, 1), chan: params, topic: trailing}, e);
                     e.mute = true;
                     break;
                 }
@@ -707,19 +779,22 @@ BSServer.prototype.onEvent = function (e) {
                                     var modepos = this.ident.prefixModes().indexOf(mode);
                                     if (modepos) {
                                         var modepar = modepars.shift();
-                                        if (modeop == '+') {
-                                            var curPrefixChar = this.getChanUser(target, modepar).prefix;
-                                            var newPrefixChar = this.ident.prefixChars()[this.ident.prefixModes().indexOf(mode)];
-                                            if (BS.util.prefixLevel(this, newPrefixChar) < BS.util.prefixLevel(this, curPrefixChar)) {
-                                                this.getChanUser(target, modepar).prefix = newPrefixChar;
+                                        var user = this.getChanUser(target, modepar || '');
+                                        if (user) {
+                                            if (modeop == '+') {
+                                                var curPrefixChar = user.prefix;
+                                                var newPrefixChar = this.ident.prefixChars()[this.ident.prefixModes().indexOf(mode)];
+                                                if (BS.util.prefixLevel(this, newPrefixChar) < BS.util.prefixLevel(this, curPrefixChar)) {
+                                                    this.getChanUser(target, modepar).prefix = newPrefixChar;
+                                                    this.getWindow(target).nicklist.update();
+                                                }
+                                            }
+                                            else {
+                                                user.prefix = '';
                                                 this.getWindow(target).nicklist.update();
                                             }
                                         }
-                                        else {
-                                            this.getChanUser(target, modepar).prefix = '';
-                                            this.getWindow(target).nicklist.update();
-                                        }
-                                        this.event('MODE', {modeop: modeop, mode: mode, modepar: modepar}, e);
+                                        this.event('MODE', {nick: prefix, modeop: modeop, mode: mode, modepar: modepar}, e);
 
                                     }
                                     else if (chanmodes[0].indexOf(mode) ||
@@ -733,7 +808,7 @@ BSServer.prototype.onEvent = function (e) {
                             }
                         }
                         else BS.log('error parsing mode: ' + tokens[1]);
-                        this.alias('ECHO', target, BS.theme.mode(tokens.words(1)));
+                        this.alias('ECHO', target, BS.theme.mode(prefix, tokens.words(1)));
                     }
                     else this.alias('ECHO', 'Status', BS.theme.usermode(params));
                     e.mute = true;
@@ -780,6 +855,10 @@ BSServer.prototype.onEvent = function (e) {
                     }
                     break;
                 }
+                case '301': {
+                    e.mute = true;
+                    break;
+                }
                 case '311': {
                     var tokens = params.split(' ');
                     this.alias('ECHO', '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
@@ -796,7 +875,7 @@ BSServer.prototype.onEvent = function (e) {
                 case '317': {
                     var tokens = params.split(' ');
                     this.alias('ECHO', '15o 07Idle15: ' + durationLong(Number(tokens[2])) + '');
-                    if (tokens[3]) this.alias('ECHO', '15o 07Signed on15: ' + (new Date(Number(tokens[3]))) + '');
+                    if (tokens[3]) this.alias('ECHO', '15o 07Signed on15: ' + BSIdent.prototype.asctime(tokens[3]));
                     e.mute = true;
                     break;
                 }
@@ -819,10 +898,13 @@ BSServer.prototype.onEvent = function (e) {
                     var chan = this.ident.gettok(params, 2, 32), topic = trailing;
                     this.proc.raw332(chan, topic);
                     e.mute = true;
+                    BS.UI.updateTitle();
                     break;
                 }
-                case '333': {// todo: handle
-                    //var chan = this.ident.gettok(params, 2, 32);
+                case '333': {
+                    var chan = this.ident.gettok(params, 2, 32), nick = this.ident.gettok(params, 3, 32), time = this.ident.gettok(params, 4, 32);
+                    this.alias('ECHO', chan, BS.theme['raw.333'](nick, time));
+                    this.alias('ECHO', chan, '7————————————————————————————————— 1-07— ——— 1-15—— — 1——14—— ——— 1--14—');
                     e.mute = true;
                     break;
                 }
@@ -886,7 +968,13 @@ BSServer.prototype.onEvent = function (e) {
                     echo = match[1];
                 }
             }
-            else if (/\.|^InfoServ$/.test(nick)) echo = 'Status';
+            else if (/^NickServ$/i.test(nick)) {
+                if (/recognized/.test(text) && this.loggingIn) {
+                    this.loggingIn = false;
+                    this.joinChans();
+                }
+            }
+            else if (/\.|^((Info|Host)Serv|Global)$/.test(nick)) echo = 'Status';
 
             this.alias('ECHO', echo, BS.theme.notice(chan, chan ? this.getChanUser(chan, nick).prefix : '', nick, text));
             break;
@@ -929,6 +1017,10 @@ BSServer.prototype.onEvent = function (e) {
     }
     // callbacks after internal processing
     for (var i = 0; i < e.after.length; i++) e.after[i].call(this, e);
+};
+BSServer.prototype.joinChans = function () {
+    var chans = BS.util.getObjectKeys(this.chans);
+    if (chans.length) this.alias('RAW', 'JOIN ' + chans.join(','));
 };
 BSServer.prototype.remChan = function (chan) {
     this.getChan(chan).win.close();
@@ -1113,11 +1205,14 @@ BSAlias.prototype.say = function () {
     this.server.alias('MSG', this.server.ident.active(), this.text);
 };
 BSAlias.prototype.serverAlias = function () {
-    var regs = this.tokens[0].split(':');
-    var server = new BSServer(regs[0], regs[1] || this.tokens[1]);
-    MB.connect(server);
+    var regs = this.text.match(/([^ :]+)(?:[ :](\+?\d+)?)(?:[ :](.+))?/);
+    if (regs) {
+        var server = new BSServer(regs[1], regs[2], {password: regs[3]});
+        MB.connect(server);
+    }
+    else this.server.alias('ECHO', '* /server: invalid parameters.');
 };
-BSAlias.prototype.s = BSAlias.prototype.server;
+BSAlias.prototype.s = BSAlias.prototype.serverAlias;
 BSAlias.prototype.slap = function () {
     this.server.alias('ME', 'slaps ' + this.text + ' around a bit with a large trout');
 };
@@ -1160,6 +1255,7 @@ BSIdent.prototype['bs.input.nick'] = function (N, C, cmd) {
 BSIdent.prototype.address = function (nick, type) { // todo: get address
     return this.mask(nick + '!*@*', type);
 };
+BSIdent.prototype.asctime = function (N) { return String(new Date(Number(N) * 1000)).replace(/ GMT.+/, ''); };
 BSIdent.prototype.chan = function (chan, prop) {
     switch (prop) {
         case 'topic': return this.server.getChan(chan).topic || '';
@@ -1257,9 +1353,8 @@ function BSProc(server) {
 }
 BSProc.prototype.raw332 = function (chan, topic) {
     this.server.getChan(chan).topic = topic;
-    this.server.alias('ECHO', chan, BS.theme.topic(topic));
+    this.server.alias('ECHO', chan, BS.theme['raw.332'](topic));
 };
-BSProc.prototype.raw333 = function () { };
 BSProc.prototype.raw353 = function (chan, names) {
     this.server.getChan(chan).addNames(names);
 };
@@ -1312,6 +1407,7 @@ BSChan.prototype.remUser = function (nick) {
     this.nicks.remove(nick);
     this.updateNicksMatch();
     this.win.nicklist.update();
+    BS.UI.updateTitle();
 };
 BSChan.prototype.resetUsers = function () {
     this.users = {};
@@ -1327,6 +1423,7 @@ BSChan.prototype.addNames = function (names) {
     for (var i = 0; i < names.length; i++) {
         var name = names[i];
         this.addUser(name.replace(prefixReg, ''), name.match(prefixReg, '')[0]);
+        BS.UI.updateTitle();
     }
 };
 BSChan.prototype.repUser = function (oldnick, newnick) {
@@ -1355,7 +1452,6 @@ function BSEditbox(label, win) {
     this.obj = document.createElement("textarea");
     this.obj.setAttribute('id', 'editbox_' + label);
     //this.obj.setAttribute('rows', '3');
-    this.obj.style.width = '99%';
     this.obj.style.height = '18px';
     document.getElementById('editboxes').appendChild(this.obj);
     this.obj.addEventListener("keydown", function (e) { parent.onKeyDown(e); }, true);
@@ -1550,13 +1646,15 @@ BSSwitchbar.prototype.update = function () {
 };
 BSSwitchbar.prototype.deselected = function (button) {
     button.element.style.backgroundColor = '';
+    button.element.style.color = '';
 };
 BSSwitchbar.prototype.selected = function (button) {
-    button.element.style.backgroundColor = 'blue';
-    button.element.style.color = '';
+    button.element.style.backgroundColor = 'rgb(30, 144, 255)';
+    button.element.style.color = '#fff';
     button.status = 0;
 };
 BSSwitchbar.prototype.newLine = function (label) {
+    BS.log('newLine:', label, this.buttons);
     var win = this.buttons[label.toLowerCase()].win;
     if (BSWindow.active != win) this.updateButton(win.button, 1);
 };
@@ -1628,13 +1726,10 @@ function BSWindow(label, server) {
     BSWindow.windows[this.wid = ++BSWindow.wid] = this; //must be set early
 
     //create msgBox
-    this.msgBox = document.createElement("tbody");
+    this.msgBox = document.createElement("div");
     this.msgBox.setAttribute('id', 'msgBox_' + label);
-    var table = document.createElement("table");
-    table.setAttribute('width', '100%');
-    table.appendChild(this.msgBox);
-    document.getElementById('scrollbox').appendChild(table);
-    this.msgBox.innerHTML = BS.logs.get(server.network, label);
+    document.getElementById('scrollbox').appendChild(this.msgBox);
+    this.msgBox.innerHTML = BS.logs.get(server.network, label).replace(/<tr><td class="line">/g, '<p>').replace(/<\/td><\/tr>/g, '</p>');
 
     this.button = server.switchbar.addButton(label, this);
 
@@ -1658,34 +1753,54 @@ BSWindow.prototype.addLine = function (text) {
         }
     }
 
-    //format text
-    text = BS.util.ircformat('15' + BS.util.clock() + '07| ' + BS.util.htmlEntities(text));
+    //add timestamp
+    text = '15' + BS.util.clock() + '07| ' + text;
+
+    //save to permanent logger
+    BS.plogs.add(this.server.network, this.label, text);
+
+    //format text (to HTML)
+    text = BS.util.ircformat(BS.util.htmlEntities(text));
+
+    //add to DOM
+    var line = document.createElement("p");
+    line.innerHTML = text;
+
+    /*
+    //find all text nodes in the line
+    var textNodes = (function (){
+        var n, a = [], walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT, null, false);
+        while (n = walk.nextNode()) a.push(n);
+        return a;
+    })();
+
+    //find chans
+    var match, regex = /\B#[^ ,]+/g;
+    for (var i = 0; i < textNodes.length; i++) {
+        if (match = textNodes[i].textContent.match(regex)) {
+            textNodes[i].parentNode.innerHTML = textNodes[i].textContent.replace(regex, '<u class="chan" data-chan="$&">$&</u>');
+        }
+    }
 
     //find nicks
     var chan = this.server.getChan(this.label);
-    if (chan) {
-      if (chan.nicksMatch) {
-        text = text.replace(chan.nicksMatch, '$1<span class="user" data-user="$2">$2</span>');
-      }
+    if (chan && chan.nicksMatch) {
+        var match, regex = chan.nicksMatch;
+        for (var i = 0; i < textNodes.length; i++) {
+            if (match = textNodes[i].textContent.match(regex)) {
+                BS.log(textNodes[i].parentNode.outerHTML);
+                textNodes[i].parentNode.innerHTML = textNodes[i].textContent.replace(regex, '$1<u class="user" data-user="$2">$2</u>');
+            }
+        }
     }
-
-    //find chans
-    text = text.replace(/\B(#[^ ,&<]+)/, '<span class="chan" data-chan="$1">$1</span>');
-
-    //add to DOM
-    var td = document.createElement("td");
-    td.setAttribute("class", "line");
-    td.innerHTML = text;
-
-    var tr = document.createElement("tr");
-    tr.appendChild(td);
+    */
 
     //detect if scrollbox is totally scrolled
     var scrollbox = document.getElementById("scrollbox");
     var scrollTop = scrollbox.scrollTop;
     scrollbox.scrollTop += 1;
     var scrolled = scrollTop == scrollbox.scrollTop;
-    this.msgBox.appendChild(tr); //append line
+    this.msgBox.appendChild(line); //append line
     scrollbox.scrollTop = scrolled ? 100000 : scrollTop; //restore scroll or scroll to bottom
 
     this.server.switchbar.newLine(this.label);
@@ -1733,19 +1848,72 @@ BSWindow.prototype.select = function () {
     if (this.nicklist) this.nicklist.selected();
     this.editbox.show();
     document.getElementById("scrollbox").scrollTop = 100000;
-
-    var title = this.label;
-    if (this.label == 'Status') title += ': ' + this.server.ident.me();
-    else if (this.server.getChan(this.label)) {
-        var chan = this.server.getChan(this.label);
-        title += ' [' + chan.nicks.length + ']';
-        if (chan.title) title += ': ' + chan.title;
-    }
-    document.getElementById("title").innerHTML = title;
+    BS.UI.updateTitle();
 };
 BSWindow.prototype.toogle = function () {
     if (BSWindow.active == this) this.deselect();
     else this.select();
+};
+
+function BSPLogger() {
+    this.logs = {};
+}
+BSPLogger.prototype.add = function (network, label, text) {
+    var id = network + '_' + label;
+    if (!this.logs[id]) this.logs[id] = ['New log session: ' + new Date().toISOString().slice(0, -5).replace(/T/, ' '), text];
+    else this.logs[id].push(text);
+};
+BSPLogger.prototype.store = function () {
+    BS.log('Storing logs:', this.logs);
+    for (var i in this.logs) if (this.logs[i].length) {
+        var id = 'plogs_' + i;
+        try {
+            localStorage.setItem(id, (id in localStorage ? localStorage.getItem(id) + "\n" : '') + this.logs[i].join("\n"));
+            this.logs[i] = [];
+        }
+        catch (e) {
+            if (confirm("The storage seems to be full and the logs must be deleted. Do you want to download them?\n\nIf you click 'cancel' the logs will be lost.")) BS.plogs.backup();
+            BS.plogs.clear();
+            return;
+        }
+    }
+};
+BSPLogger.prototype.backup = function (network, label, format) {
+    if (network && label) {
+        var i = 'plogs_' + network + '_' + label;
+        var log = localStorage.getItem(i) || '';
+        if (format == 'strip') log = log.replace(/(1[0-5]|0?[0-9](,(1[0-5]|0?[0-9]))?)?|[]/g, '');
+        localStorage.removeItem(i);
+        var fileName = network + ' ' + label + ' ' + (new Date().toISOString().slice(0, -5).replace(/T/, ' ').replace(/:/g, '.')) + ".log";
+        var file = new File([log], fileName, {type: "plain/text"});
+        var url = URL.createObjectURL(file);
+        var a = document.createElement('a');
+        a.setAttribute('href', url);
+        var d = new Date();
+        a.setAttribute('download', fileName);
+        a.click();
+    }
+    else {
+        for (var i in localStorage) {
+            var match;
+            if (match = i.match(/^plogs_(.+?)_(.+)/)) {
+                this.backup(match[1], match[2], format);
+            }
+        }
+    }
+};
+BSPLogger.prototype.download = function (network, label, format) {
+    this.store();
+    this.backup(network, label, format);
+    this.logs = {};
+};
+
+BSPLogger.prototype.clear = function () {
+    for (var i in localStorage) {
+        if (/^plogs_/.test(i)) {
+            localStorage.removeItem(i);
+        }
+    }
 };
 
 function BSLogger() {

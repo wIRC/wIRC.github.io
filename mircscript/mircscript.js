@@ -16,7 +16,7 @@ BSParser.castBool = function (str) {
 BSParser.castNumber = function (str) {
     return isNaN(str) ? str : Number(str);
 };
-BSParser.parseTexatGlob = function (str) {
+BSParser.parseTextGlob = function (str) {
     return new RegExp('^'+escapeRegExp(str).replace('\\*', '.*')+'$', 'i');
 };
 BSParser.parseTargetGlob = function (target) {
@@ -25,7 +25,7 @@ BSParser.parseTargetGlob = function (target) {
     return `vars.chan.match(/^(${escapeRegExp(target).replace(/ *, */, '|')})$/i)`;
 };
 BSParser.parseNode = function (node) {
-    BS.log('parseNode:', node);
+    //BS.log('parseNode:', node);
     var parse = function (node) { return BSParser.parseNode(node); };
     if (!node) return;
     switch (node.type) {
@@ -38,8 +38,8 @@ BSParser.parseNode = function (node) {
                         // TODO: optimize
                         var conds = [];
                         conds.push(`vars.type == '${programNode.name}'.toUpperCase()`);
-                        if (programNode.text != '*') conds.push(`vars.text.match(${BSParser.parseTextGlob(programNode.text)})`);
-                        if (programNode.target != '*') conds.push(BSParser.parseTargetGlob(programNode.target));
+                        if (programNode.text && programNode.text != '*') conds.push(`vars.text.match(${BSParser.parseTextGlob(programNode.text)})`);
+                        if (programNode.target && programNode.target != '*') conds.push(BSParser.parseTargetGlob(programNode.target));
                         program.events.push(`\nif (${conds.join(" && ")}) ${parse(programNode.body)}`);
                         break;
                     }
@@ -56,7 +56,7 @@ BSParser.parseNode = function (node) {
             }
             BS.scriptAliases = program.aliases; // fixme: sets aliases every time we parse a program
             program.JS = program.JS.join("\n");
-            program.events.join("\n");
+            program.events = program.events.join("\n");
             program = program.JS + "\n" + program.events;
             return program;
         }
@@ -287,6 +287,6 @@ BSParser.parseCommand = function (code) {
         }
     }
     while (objStack.length) popState();
-    BS.log('Time to parse: '+Math.round(Date.now() - now)+' ms. Result:', obj);
+    //BS.log('Time to parse: '+Math.round(Date.now() - now)+' ms. Result:', obj);
     return obj;
 };

@@ -18,25 +18,15 @@ a {
 table {
   border-collapse: collapse;
 }
-tr.title {
-  background-color: #202020;
-  border-bottom: 1px solid #d0d0d0;
-}
-td.title {
-  color:#FFFFFF;
-  font-size: 12px;
-  font-weight: bold;
-  text-align: center;
-}
-td.line {
-  text-align: left;
-}
 input, textarea, select {
   background-color: #000000;
   color: #d0d0d0;
   font-family: Verdana, Arial, Helvetica, Sans-serif;
   font-size: 12px;
   border: 1px solid #d0d0d0;
+}
+u {
+    text-decoration: none;
 }
 .hl {
   color: #ff8000;
@@ -47,33 +37,78 @@ input, textarea, select {
 .nick {
   color: #808080;
 }
-#nicklist  {
-  height: 100%;
+#nicklist {
+  _height: 100%;
   vertical-align: top
 }
 #nicklist, .user, .chan {
     cursor: pointer;
 }
+#container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+#titleLine {
+    background-color: #202020;
+    display: flex;
+    flex-direction: row;
+    min-height: 26px;
+}
+#title {
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    font-size: 12px;
+    font-weight: bold;
+    justify-content: center;
+    text-align: center;
+}
+#body {
+    border-top: 1px solid #d0d0d0;
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+}
 #nicklist select {
     border: 0;
     height: 100%;
+    margin-top: 1px;
     overflow-y: auto;
     overflow-x: hidden;
     outline: 0;
     width: 125px;
 }
 #scrollbox {
-  width: 100%;
-  height: 100%;
-  line-height: 1.3em;
-  overflow-y: scroll;
-  -webkit-overflow-scrolling: touch;
+    border-left: 1px solid #d0d0d0;
+    flex-grow: 1;
+    line-height: 1.3em;
+    margin-left: 1px;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+}
+#scrollbox div {
+    width: 100%;
+    overflow-wrap: break-word;
+}
+#scrollbox p {
+    margin: 1px;
 }
 #switchbar {
-  vertical-align: top;
+    vertical-align: top;
+    margin-top: 2px;
 }
 #switchbar input {
-  width: 125px;
+    margin-bottom: 2px;
+    width: 125px;
+}
+#editboxes {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    min-height: 26px;
 }
 
 .b { font-weight: bold; }
@@ -136,13 +171,21 @@ input, textarea, select {
     width: 95%;
     font-family: monospace;
 }
-.buttons button {
+#buttons {
+    background-color: #f0f0f0;
+}
+#buttons button {
+    background-color: transparent;
     padding: 0;
+    width: 33px;
+    height: 26px;
+    border: 1px;
+}
+#buttons button:hover {
+    border: solid 1px #c0dcf3;
 }
 .buttons img {
     display: block;
-    height: 20px;
-    width: 20px;
 }
 
 .contextmenu-custom {
