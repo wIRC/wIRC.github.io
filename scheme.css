@@ -1,0 +1,49 @@
+body {
+    background-color: #262626;
+    color: #ccc;
+}
+a {
+    color: #fff;
+}
+input, textarea, select {
+    background-color: #262626;
+    border-color: #4c4c4c;
+    color: #ccc;
+}
+#titleLine, #nicklist, #nicklist select, #switchbar {
+    background-color: #202020;
+}
+#title {
+    color: #fff;
+}
+#body, #scrollbox, #nicklist select {
+    border-color: #4c4c4c;
+}
+.hl {
+    color: #ff8000;
+}
+.nickMe {
+    color: #ccc;
+}
+.nick {
+    color: #808080;
+}
+input.selected {
+    background-color: #4c4c4c;
+    color: #fff;
+}
+input.newLine {
+    color: #0080ff;
+}
+input.newMsg {
+    color: #ff0000;
+}
+input.highlight {
+    color: #009000;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #181818;
+}
+::-webkit-scrollbar-track-piece {
+    background-color: #2e3136;
+}

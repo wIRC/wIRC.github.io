@@ -13,7 +13,7 @@ BSIdent.prototype.asc = function (c) { return c.charCodeAt(0); };
 BSIdent.prototype.base = function (n, inbase, outbase, zeropad, precision) {
     return parseInt(n, inbase).toString(outbase);
 };
-BSIdent.prototype.calc = function (operations) { return eval(operations); }; // todo: proper parsing
+BSIdent.prototype.calc = function (operations) { return eval(operations) || 0; }; // todo: proper parsing
 BSIdent.prototype.ceil = function (n) { return Math.ceil(n); };
 BSIdent.prototype.chr = function (n) { return String.fromCharCode(n); };
 BSIdent.prototype.cos = function (n) { return Math.cos(n); };

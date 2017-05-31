@@ -162,7 +162,6 @@ Identifier "Identifier"
   { return {type: 'Identifier', name: "iif", args: args && args[2] ? [test].concat(args[2]) : [test], source: text()}; }
   / "$" name:IdentifierName args:("(" _ ArgumentList? _ ")")? prop:IdentifierProp? {
   return {type: 'Identifier', name: name, args: args && args[2], prop: prop, source: text()}; }
-  / "#" prop:IdentifierProp? {return {type: 'Identifier', name: chan, prop: prop, source: text()}; }
 
 Variable
   = "%" name:IdentifierName { return {type: 'Variable', name: name}; }

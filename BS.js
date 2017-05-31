@@ -7,6 +7,7 @@ var BS = {
     scriptAliases: {},
     onLoad: function () {
         //init
+        BS.UI.updateStyle();
         BS.logs = new BSLogger();
         BS.plogs = new BSPLogger();
         setInterval(function () { BS.plogs.store(); }, 30000);
@@ -15,6 +16,7 @@ var BS = {
         var state = BS.sets.get('state');
         if (state) {
             BS.log('Restoring state:', state);
+            if (state.variables) BS.variables = state.variables;
             for (var i = 0; i < state.servers.length; i++) {
                 var serverState = state.servers[i];
                 var server = new BSServer(serverState.hostname, serverState.port,
@@ -48,9 +50,13 @@ var BS = {
             var tokens = regs[1].split(',');
             for (var i = 0; i < tokens.length; i++) {
                 var token = tokens[i];
-                if (/^#/.test(token)) chans.push(token);
-                else if (/\./.test(token)) hostname = token;
-                else if (/^\+?\d+$/.test(token)) port = token;
+                var matches;
+                if (matches = token.match(/^(.+?(?:\..+?)+)(?::(\+\d+))?$/)) {
+                    console.log(matches);
+                    hostname = matches[1];
+                    if (matches[2]) port = matches[2];
+                }
+                else if (/^#/.test(token)) chans.push(token);
                 else nick = token;
             }
 
@@ -94,6 +100,15 @@ var BS = {
             BSWindow.active.editbox.focus();
         });
 
+        document.getElementById('scrollbox').addEventListener("dblclick", function () {
+            var active = BSWindow.active;
+            if (BS.util.isChanName(active.label)) {
+                active.server.alias('MODE ' + active.label);
+                active.server.alias('MODE ' + active.label + ' +b');
+            }
+            else active.server.alias('WHOIS ' + active.label);
+        });
+
         document.addEventListener("dblclick", function (e) {
             var user = e.target.getAttribute('data-user');
             var chan = e.target.getAttribute('data-chan');
@@ -121,10 +136,16 @@ var BS = {
         });
 
         // settings window
-        var modal = document.getElementById('modal');
         var settingsButton = document.getElementById("settingsButton");
         var closeButton = document.getElementsByClassName("closeButton")[0];
-        var sets = BS.sets.get('sets') || {userScript: ''};
+        var setsFontSize = document.getElementById('setsFontSize');
+        var setsFontSizeValue = document.getElementById('setsFontSizeValue');
+        var setsShowEmbeds = document.getElementById('setsShowEmbeds');
+
+        var sets = BS.sets.get('sets') || {};
+        if (!sets.userScript) sets.userScript = '';
+        if (!sets.fontSize) sets.fontSize = '';
+        if (sets.showEmbeds === undefined) sets.showEmbeds = true;
         var applyUserScript = function (userScript) {
             if (!userScript) return BS.eventHandlers[0] = null;
             try {
@@ -136,29 +157,40 @@ var BS = {
                 })`;
                 BS.log('Compiled UserScript:', code);
                 BS.eventHandlers[0] = eval(code);
+                // call load and start event on first server
+                for (var i in BS.servers) {
+                    BS.servers[i].event('LOAD');
+                    BS.servers[i].event('START');
+                    break;
+                }
                 return null;
             } catch (e) { BS.log('Error on userScript:', e); return e; }
         };
         applyUserScript(sets.userScript);
         settingsButton.onclick = function() {
             document.getElementById('userScript').value = sets.userScript;
+            setsFontSizeValue.innerHTML = setsFontSize.value = sets.fontSize;
+            setsShowEmbeds.checked = sets.showEmbeds;
             var downloadBackup = document.getElementById('downloadBackup');
             downloadBackup.href = BS.sets.backup();
-            modal.style.display = "block";
+            BS.UI.modal.show('settings');
         };
         var settingOkButtonCallback = function (close) {
             var userScript = document.getElementById('userScript').value;
             var error = applyUserScript(userScript);
             if (!error || confirm('Error on userscript:\n\n' + error.valueOf()+'\n\nSave anyway?')) {
                 sets.userScript = userScript;
+                sets.fontSize = setsFontSize.value;
+                sets.showEmbeds = setsShowEmbeds.checked;
                 BS.sets.set('sets', sets);
-                if (close) modal.style.display = "none";
+                BS.UI.updateStyle();
+                if (close) BS.UI.modal.hide('settings');
             }
         };
         document.getElementById('settingsOkButton').addEventListener('click', function () { settingOkButtonCallback(true); });
         document.getElementById('settingsApplyButton').addEventListener('click', function () { settingOkButtonCallback(); });
         document.getElementById('settingsCancelButton').addEventListener('click', function () {
-            modal.style.display = "none";
+            BS.UI.modal.hide('settings');
         });
         document.getElementById('userScript').placeholder = `Use JavaScript syntax
 The code here will be called for every event.
@@ -202,8 +234,31 @@ alias hi say Hi $1-!
                 BSPLogger.prototype.download();
             }
         });
+
+        setsFontSize.addEventListener('input', function () {
+            setsFontSizeValue.innerHTML = setsFontSize.value;
+        });
+
         addEventListener("beforeunload", BS.onUnload);
 
+        addEventListener("keydown", function (e) {
+            // F12
+            if (e.keyCode == 123 && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                var server = BSWindow.active.server;
+                if (server.away) server.alias('AWAY');
+                else {
+                    var reason = prompt('Away reason?', 'Not here.');
+                    if (reason !== null) server.alias('AWAY ' + reason);
+                }
+                e.preventDefault();
+            }
+        });
+
+        // call start event on first server
+        for (var i in BS.servers) {
+            BS.servers[i].event('START');
+            break;
+        }
 
     },
     onUnload: function () {
@@ -214,9 +269,6 @@ alias hi say Hi $1-!
         BS.sets.saveEditboxHistory();
         BS.sets.saveState();
         BS.plogs.store();
-    },
-    onReadyToConnect: function () {
-        for (var i in BS.servers) MB.connect(BS.servers[i]);
     },
     log: console.log.bind(console, 'BS'),
     sets: {
@@ -265,7 +317,9 @@ alias hi say Hi $1-!
                 var serverState = {};
                 if (BSWindow.active.server == server) serverState.active = BSWindow.active.label;
                 serverState.nick = server.nick;
-                serverState.chans = BS.util.getObjectKeys(server.chans);
+                serverState.chans = [];
+                for (var i in server.chans) serverState.chans.push(server.chans[i].name);
+                //serverState.chans = BS.util.getObjectKeys(server.chans);
                 serverState.queries = BS.util.getObjectKeys(server.queries);
                 serverState.hostname = server.hostname;
                 serverState.port = server.port;
@@ -274,7 +328,7 @@ alias hi say Hi $1-!
                 serverState.password = server.password;
                 servers.push(serverState);
             }
-            BS.sets.set('state', {servers: servers});
+            BS.sets.set('state', {servers: servers, variables: BS.variables});
         },
         backup: function () {
             var sets = {};
@@ -295,22 +349,42 @@ alias hi say Hi $1-!
     },
     raws: {
         getWindow: function (raw) {
-            if (/00[1-5]|042|25[1-5]|265|266|353|366|372|375|376|396|error/i.test(raw)) return 'Status';
+            if (/00[1-5]|042|25[1-5]|265|266|353|366|372|375|376|396|464|error/i.test(raw)) return 'Status';
             return null;
         }
     },
     theme: {
+        prefixColor: function (prefix) {
+            switch (prefix) {
+                case '': return '';
+                case '~': return '4';
+                case '@': return '7';
+                case '%': return '11';
+                case '+': return '3';
+            }
+            return '';
+        },
+        prefix: function (prefix) {
+            var color = BS.theme.prefixColor(prefix);
+            if (color) return '' + color + prefix;
+            return prefix;
+        },
         action: function (prefix, nick, text) {
-            return '07! 15' + prefix + nick + ' ' + text;
+            return '07! ' + BS.theme.prefix(prefix) + '15' + nick + ' ' + text;
+        },
+        away: function (nick, reason) {
+            return '15o Away: 07' + nick + ' 15is ' + (reason ? 'away: 07' + reason : 'no longer away');
         },
         highlight: function (chan, nick, text) {
             return (chan ? '07[15' + chan + '07] ' : '') + '07(15' + nick + '07) ' + text;
         },
         msg: function (prefix, nick, text) {
-            return '07(15' + prefix + nick + '07) ' + text;
+            return BS.theme.prefix(prefix) + '15' + nick + '07 ' + text;
+            //return '07(' + BS.theme.prefix(prefix) + '15' + nick + '07) ' + text;
         },
         msgSelf: function (prefix, nick, text) {
-            return '07(15' + prefix + nick + '07) ' + text;
+            return BS.theme.prefix(prefix) + '00' + nick + '07 ' + text;
+            //return '07(' + BS.theme.prefix(prefix) + '00' + nick + '07) ' + text;
         },
         nick: function (nick, newnick) {
             return '15o Nick: 07' + nick + ' 15is now known as 07' + newnick;
@@ -336,6 +410,9 @@ alias hi say Hi $1-!
         'raw.333': function (nick, time) {
             return '15o 07Set by15: ' + nick + ' 07on15: ' + BSIdent.prototype.asctime(time);
         },
+        timestamp: function (clock) {
+            return '15' + clock + '07| ';
+        },
         mode: function (nick, modes) {
             return '15o Mode: 07' + nick + ' 15sets mode07: ' + modes;
         },
@@ -348,10 +425,26 @@ alias hi say Hi $1-!
         usermode: function (modes) {
             return '15o Usermode: ' + modes;
         }
-    },
+    },/*
+    mts: {
+        theme: {
+            'RAW.001': '<pre><c2> <text>'
+        },
+        parse: function (name) {
+            BS.mts.parsed[name] || (BS.mts.parsed[name] = (function () {
+                var source = BS.mts.theme[name];
+
+            }));
+        },
+        parsed: {}
+    },*/
     UI: {
         beep: function () { document.getElementById("beep").play(); },
-        echo: function (text, win) {
+        echo: function (text, win, params) {
+            if (!params) params = {"t": ""};
+            //add timestamp
+            if ('t' in params) text = BSIdent.prototype.timestamp() + text;
+
             (win || BSWindow.active).addLine(text);
         },
         flash: {
@@ -359,7 +452,9 @@ alias hi say Hi $1-!
             newTitle: "",
             status: false,
             timer: 0,
-            perform: function (text) {
+            endTime: 0,
+            perform: function (text, duration) {
+                BS.UI.flash.endTime = duration ? Date.now() + duration : 0;
                 var flash = BS.UI.flash;
                 if (!flash.status) flash.oldTitle = document.title;
                 flash.status = true;
@@ -368,7 +463,9 @@ alias hi say Hi $1-!
             },
             start: function () {
                 var flash = BS.UI.flash;
-                if (document.visibilityState == 'visible') BS.UI.flash.cancel();
+                if (document.visibilityState == 'visible' || (BS.UI.flash.endTime && Date.now() > BS.UI.flash.endTime)) {
+                    BS.UI.flash.cancel();
+                }
                 else {
                     document.title = flash.newTitle;
                     clearTimeout(flash.timer);
@@ -395,7 +492,7 @@ alias hi say Hi $1-!
                 if (text.match(reg)) {
                     //text = '<u class="hl">'+text+'</u>';
                     BS.UI.highlight.perform(server, text, nick, chan);
-                    text = text.replace(reg, '07$115');
+                    text = text.replace(reg, '07$115');
                 }
                 return text;
             },
@@ -421,6 +518,41 @@ alias hi say Hi $1-!
                 }
             }
         },
+        modal: {
+            input: function (prompt, callback) {
+                BS.UI.modal.show('input');
+                var OKButton = document.getElementById('modalOkButton');
+                var cancelButton = document.getElementById('modalCancelButton');
+                document.getElementById('modalPrompt').innerText = prompt;
+                OKButton.focus();
+                var OKClick = function () {
+                    OKButton.removeEventListener('click', OKClick);
+                    BS.UI.modal.hide('input');
+                    callback(true);
+                };
+                var cancelClick = function () {
+                    OKButton.removeEventListener('click', cancelClick);
+                    BS.UI.modal.hide('input');
+                    callback(false);
+                };
+                OKButton.addEventListener('click', OKClick);
+                cancelButton.addEventListener('click', cancelClick);
+                BS.UI.modal.show('input');
+            },
+            show: function (id) {
+                var modal = document.getElementById('modal');
+                modal.style.display = "block";
+                var content = document.getElementById("modal-" + id);
+                content.style.display = "block";
+            },
+            hide: function (id) {
+                var modal = document.getElementById('modal');
+                modal.style.display = "none";
+                var content = document.getElementById("modal-" + id);
+                content.style.display = "none";
+            }
+
+        },
         notification: {
             perform: function (title) {
                 BS.UI.notification.withPermission(function () {
@@ -440,17 +572,32 @@ alias hi say Hi $1-!
                 }
             }
         },
+        updateLag: function () {
+            var active = BSWindow.active;
+            document.getElementById("lag").innerHTML = 'Lag: ' + MB.lag + '/' + (active.server.lag ? active.server.lag : '-') + ' ms';
+        },
+        updateStyle: function () {
+            var styleObj = document.getElementById('style');
+            var sets = BS.sets.get('sets') || {};
+            var fontSize = Number(sets.fontSize);
+            style.innerHTML = '';
+            if (fontSize) style.innerHTML += 'body { font-size: ' + fontSize + 'px; }\n';
+            if (!sets.showEmbeds) style.innerHTML += '.expando { display: none; }\n';
+        },
         updateTitle: function () {
             var active = BSWindow.active, title = active.label, chan = null;
             if (active.label == 'Status') title = active.server.network + ' ' + active.server.ident.me();
             else if (chan = active.server.getChan(active.label)) {
                 title += ' [' + chan.nicks.length + ']';
-                if (chan.topic) title += ': ' + chan.topic;
+                if (chan.topic) title += ': ' + BS.util.ircformat(chan.topic);
             }
-            document.getElementById("title").innerHTML = title;
+            document.getElementById("title").innerHTML = '<span>' + title + '</span>';
         }
     },
     util: {
+        allServers: function (cb) {
+            for (var i in BS.servers) cb(BS.servers[i]);
+        },
         applyMode: function (mode, text) {
             var regs, chan, nicks;
             if (regs = text.match(/^(#[^ ]+) (.+)$/)) {
@@ -493,21 +640,44 @@ alias hi say Hi $1-!
         ircformat: function (str) {
             //b k i r o u
             if (!str) return "";
+
+            // embeds
+            var matches;
+            var embed = '';
+            if (matches = str.match(/(https?:\/\/i\.imgur\.com\/[^.]+)\.gifv/i)) {
+                embed = '<video width="400" height="225" src="' + matches[1] + '.mp4" controls="controls" loop="" preload="metadata"></video>';
+            }
+            else if (matches = str.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)/i)) {
+                embed = '<a href="' + matches[0] + '" target="_blank"><img src="' + matches[0] + '" /></a>';
+            }
+            else if ((matches = str.match(/https?:\/\/(?:[^.]+)\.youtube\.com\/watch\?v=([^ ]+)/i)) || (matches = str.match(/https?:\/\/youtu\.be\/([^ ]+)/i))) {
+                embed = '<iframe width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + '" frameborder="0" allowfullscreen></iframe>';
+            }
+            else if (matches = str.match(/https?:\/\/[^ ]+\.(?:mp4)/i)) {
+                embed = '<video width="400" height="225" src="' + matches[0] + '" controls="controls" loop="" preload="metadata"></video>';
+            }
+
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="b">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="u">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="i">$1</u>');
-            str = str.replace(/(https?:\/\/)([^ ]+\/?)\b/ig, function (match, p1, p2) {
-                var a = document.createElement('a');
-                a.setAttribute('target', 'blank');
-                a.setAttribute('href', match);
-                a.appendChild(document.createTextNode(match));
-                return a.outerHTML;
+            str = str.replace(/(https?:\/\/)([^ <]+\/?)\b/ig, function (match, p1, p2) {
+                // html is already sanitized
+                return '<a target="_blank" href="' + match + '">' + match + '</a>';
                 //return '<a target="_blank" href="'+ p1 + p2.replace(/[a-z]/ig, function (match) { return '%' + parseInt(match.charCodeAt(0)).toString(16); }) +'">' + match + '</a>';
+
+                //var a = document.createElement('a');
+                //a.setAttribute('target', 'blank');
+                //a.setAttribute('href', match);
+                //a.appendChild(document.createTextNode(match));
+                //return a.outerHTML;
             });
             str = str.replace(/(1[0-5]|0?\d)(?:,(1[0-5]|0?\d))?([^]+)(?:(?=|)|$)/g, function (match, c, bc, text) {
                 return '<u class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</u>';
             });
             str = str.replace(/|/g, '');
+
+            if (embed) str += '<u class="embed">' + embed + '</u>';
+
             return str;
         },
         getObjectKeys: function (obj) {
@@ -539,7 +709,7 @@ function BSServer(hostname, port, init) {
     this.queries = {};
     this.windows = {};
     this.raws = {};
-    this.status = -1;
+    this.status = 3; // 0 - connecting, 1 - connected, 2 - disconnecting, 3 - disconnected
     this.lastInputTime = Date.now();
     this.prefix = {prefix: '(yqaohv)!~&@%+', modes: 'yqaohv', chars: '!~&@%+'};
     this.hostname = hostname;
@@ -550,7 +720,7 @@ function BSServer(hostname, port, init) {
     this.loggingIn = false;
     BS.servers[this.cid = ++BS.cid] = this;
     // after default values, load custom values
-    if (init) for (var i in init) this[i] = init[i];
+    if (init) for (var i in init) if (init[i] !== undefined) this[i] = init[i];
     // now that everything is set:
     this.ident = new BSIdent(this);
     this.switchbar = new BSSwitchbar(this);
@@ -558,10 +728,15 @@ function BSServer(hostname, port, init) {
     this.win = new BSWindow('Status', this);
 }
 BSServer.prototype.addChan = function (chan) {
-    this.chans[chan.toLowerCase()] = new BSChan(chan, new BSWindow(chan, this));
+    if (chan) return this.chans[chan.toLowerCase()] = new BSChan(chan, new BSWindow(chan, this));
 };
 BSServer.prototype.addQuery = function (nick) {
     this.queries[nick.toLowerCase()] = new BSQuery(nick, new BSWindow(nick, this));
+};
+BSServer.prototype.renameQuery = function (nick, newnick) {
+    var query = this.queries[newnick.toLowerCase()] = this.queries[nick.toLowerCase()];
+    delete(this.queries[nick.toLowerCase()]);
+    query.rename(newnick);
 };
 BSServer.prototype.alias = function () {
     var args = Array.prototype.slice.call(arguments).join(" ").split(" ");
@@ -571,7 +746,7 @@ BSServer.prototype.alias = function () {
     this.event('ALIAS', {alias: alias, text: text, tokens: tokens});
 };
 BSServer.prototype.call = function (text) {
-    var words = text.split(' ');
+    var words = String(text).split(' ');
     this.alias(words[0].toUpperCase(), words.slice(1).join(' '));
 };
 BSServer.prototype.close = function () {
@@ -595,6 +770,10 @@ BSServer.prototype.evalCommand = function (code, vars) {
 BSServer.prototype.applyIdent = function (name, args, vars) {
     if (vars && vars[name]) return vars[name];
     name = name.toLowerCase().replace('server', 'serverIdent').replace(/^\$/, '');
+    //BS.log('ApplyIdent: ', name, args, vars);
+    if (name == 'js') {
+        return eval(args[0]);
+    }
     if (!this.ident[name]) {
         BS.log('No such identifier:', name);
         return "";
@@ -618,27 +797,48 @@ BSServer.prototype.getWindow = function (label) {
     return label && this.windows[label.toLowerCase()];
 };
 BSServer.prototype.onEvent = function (e) {
-    for (var i = 0; i < BS.eventHandlers.length; i++) if (BS.eventHandlers[i]) BS.eventHandlers[i].call(this, e);
-    BS.log('event:', e);
+    for (var i = 0; i < BS.eventHandlers.length; i++) {
+        if (BS.eventHandlers[i]) {
+            try { BS.eventHandlers[i].call(this, e); }
+            catch (e) { BS.log('Error on eventHandler[' + i + ']:', e); }
+        }
+    }
+    BS.log('event:', e.type, e);
+    if (e.haltdef) return;
+    e.theme = [];
     switch (e.type) {
         case 'ALIAS': {
             new BSAlias(this, e.alias, e.text, e.tokens);
             break;
         }
         case 'CTCP': {
-            switch (e.ctcp) {
+            var tokens = e.text.split(' ');
+            switch (tokens[0]) {
                 case 'VERSION': {
                     this.alias('CTCPREPLY', e.nick + ' VERSION ' + this.ident.version());
                     break;
                 }
                 case 'PING': {
-                    this.alias('CTCPREPLY', e.nick + ' PING ' + e.text);
+                    this.alias('CTCPREPLY', e.nick + ' PING ' + tokens[1]);
                     break;
                 }
             }
+            this.alias('ECHO', 'CTCP from ' + e.nick + ': ' + e.text);
+            break;
+        }
+        case 'CTCPREPLY': {
+            var tokens = e.text.split(' ');
+            switch (tokens[0]) {
+                case 'PING': {
+                    this.alias('ECHO', 'Ping reply from ' + e.nick + ': ' + (Date.now() - Number(tokens[1])) + ' ms');
+                    break;
+                }
+            }
+            this.alias('ECHO', 'CTCPREPLY from ' + e.nick + ': ' + e.text);
             break;
         }
         case 'DISCONNECT': {
+            this.status = 3;
             var msg = '* Disconnected' + (e.text ? ': ' + e.text : '');
             this.alias('ECHO', 'Status', msg);
             for (var i in this.windows) if (/^#/.test(i)) BS.UI.echo(msg, this.getWindow(i));
@@ -648,10 +848,14 @@ BSServer.prototype.onEvent = function (e) {
         case 'JOIN': {
             var chan = e.chan, nick = e.nick, mask = e.mask;
             if (nick == this.ident.me()) {
-                if (!this.getChan(chan)) this.addChan(chan);
-                this.alias('ECHO', chan, '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
-                this.alias('ECHO', chan, BS.theme.joinMe(nick, mask, chan));
-                this.alias('ECHO', chan, '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
+                var chanObj = this.getChan(chan);
+                if (!chanObj) {
+                    this.addChan(chan);
+                    this.alias('ECHO', chan, '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
+                    this.alias('ECHO', chan, BS.theme.joinMe(nick, mask, chan));
+                    this.alias('ECHO', chan, '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
+                }
+                else chanObj.showTopic = false;
             }
             else {
                 this.getChan(chan).addUser(nick);
@@ -688,12 +892,13 @@ BSServer.prototype.onEvent = function (e) {
                     this.chans[chan].remUser(nick);
                 }
             }
+            if (this.getQuery(nick)) this.alias('ECHO', nick, BS.theme.quit(nick, text));
             break;
         }
         case 'TOPIC': {
             var chan = e.chan, topic = e.topic, nick = e.nick;
-            this.getChan(chan).topic = topic;
             this.alias('ECHO', chan, BS.theme.topic(nick, topic));
+            this.getChan(chan).topic = topic;
             BS.UI.updateTitle();
             break;
         }
@@ -706,9 +911,13 @@ BSServer.prototype.onEvent = function (e) {
                     this.getChan(chan).repUser(nick, newnick);
                 }
             }
+            // update query window
+            var query = this.getQuery(nick);
+            if (query) this.renameQuery(nick, newnick);
             break;
         }
         case 'CONNECT': {
+            this.status = 1;
             if (this.login) {
                 var pass = BS.sets.getLogin(this.hostname, this.login);
                 if (pass) {
@@ -730,10 +939,10 @@ BSServer.prototype.onEvent = function (e) {
             break;
         }
         case 'RAW': {
-            var prefix = e.prefix, command = e.command, params = e.params, trailing = e.trailing;
+            var prefix = e.prefix, command = e.command, params = e.params || '', trailing = e.trailing || '', paramsall = params + ' ' + trailing;
             switch (command) {
                 case 'JOIN': {
-                    this.event('JOIN', {chan: trailing || params, nick: this.ident.unmask(prefix, 1), mask: this.ident.gettok(prefix, 2, 33)}, e);
+                    this.event('JOIN', {chan: trailing || params.word(1), nick: this.ident.unmask(prefix, 1), mask: this.ident.gettok(prefix, 2, 33)}, e);
                     e.mute = true;
                     break;
                 }
@@ -743,7 +952,7 @@ BSServer.prototype.onEvent = function (e) {
                     break;
                 }
                 case 'PART': {
-                    this.event('PART', {chan: params, nick: this.ident.unmask(prefix, 1), text: trailing}, e);
+                    this.event('PART', {chan: params.word(1), nick: this.ident.unmask(prefix, 1), text: trailing}, e);
                     e.mute = true;
                     break;
                 }
@@ -815,7 +1024,7 @@ BSServer.prototype.onEvent = function (e) {
                     break;
                 }
                 case 'NICK': {
-                    this.event('NICK', {nick: this.ident.unmask(prefix, 1), newnick: params}, e);
+                    this.event('NICK', {nick: this.ident.unmask(prefix, 1), newnick: params.word(0)}, e);
                     e.mute = true;
                     break;
                 }
@@ -835,17 +1044,20 @@ BSServer.prototype.onEvent = function (e) {
                     break;
                 }
                 case '001': {
-                    this.setMe(params);
+                    this.setMe(params.word(0));
                     this.event('CONNECT', {}, e);
-                    e.mute = true;
+                    e.theme = [['Status', trailing]];
                     break;
                 }
+                case '002': e.theme = [['Status', trailing]]; break;
+                case '003': e.theme = [['Status', trailing]]; break;
+                case '004': e.theme = [['Status', params.words(1)]]; break;
                 case '005': {
                     if (!this.raws['005']) this.raws['005'] = {};
                     var pairs = params.split(' ');
                     pairs.shift();
                     for (var i = 0; i < pairs.length; i++) {
-                        var regs = pairs[i].match(/^([^=]+)(?:=(.+))?$/);
+                        var regs = pairs[i].match(/^([^=]+)(?:=(.*))?$/);
                         this.raws['005'][regs[1]] = regs[2];
                     }
                     //update server.prefix
@@ -853,29 +1065,56 @@ BSServer.prototype.onEvent = function (e) {
                         var match = this.raws['005']['PREFIX'].match(/(?:\((.+)\))?(.+)/);
                         this.prefix = {prefix: match[0], modes: match[1], chars: match[2]};
                     }
+                    if (this.raws['005']['NETWORK']) this.setNetwork(this.raws['005']['NETWORK']);
+                    e.theme = [['Status', 'Protocols supported by this server: ' + params.words(1)]];
                     break;
                 }
+                case '042': e.theme = [['Status', 'Unique ID: ' + params.words(1)]]; break;
+                case '251': e.theme = [['Status', trailing]]; break;
+                case '252': e.theme = [['Status', params.words(1) + ' ' + trailing]]; break;
+                case '253': e.theme = [['Status', params.words(1) + ' ' + trailing]]; break;
+                case '254': e.theme = [['Status', params.words(1) + ' ' + trailing]]; break;
+                case '255': e.theme = [['Status', trailing]]; break;
+                case '265': e.theme = [['Status', trailing]]; break;
+                case '266': e.theme = [['Status', trailing]]; break;
                 case '301': {
+                    var nick = params.word(1), reason = trailing, inChannel = false;
+                    var message = BS.theme.away(nick, reason);
+                    /*for (var chan in this.chans) {
+                        if (this.getChanUser(chan, nick)) {
+                            this.alias('ECHO', chan, message);
+                            inChannel = true;
+                        }
+                    }*/
+                    if (!inChannel) this.alias('ECHO', message);
                     e.mute = true;
                     break;
                 }
+                case '305': {
+                    e.theme = [[trailing]];
+                    this.away = false;
+                    break;
+                }
+                case '306': {
+                    e.theme = [[trailing]];
+                    this.away = true;
+                    break;
+                }
                 case '311': {
-                    var tokens = params.split(' ');
                     this.alias('ECHO', '7——————————————————————————— 1-15— ——— 1-14—— — 1——14—');
-                    this.alias('ECHO', '15o07 /Whois15: ' + tokens[1] + '07!15' + tokens[2] + '07@15w' + tokens[3] + ' 07(15' + trailing + '07)');
+                    this.alias('ECHO', '15o07 /Whois15: ' + params.word(1) + '07!15' + params.word(2) + '07@15' + params.word(3) + ' 07(15' + trailing + '07)');
                     this.alias('ECHO', '7——————————————————— 1-15— ——— 1-14—— — 1——14—');
                     e.mute = true;
                     break;
                 }
                 case '312': {
-                    this.alias('ECHO', '15o 07Server: ' + params.split(' ')[2] + ' 07(15' + trailing + '07)');
+                    this.alias('ECHO', '15o 07Server: ' + params.word(2) + ' 07(15' + trailing + '07)');
                     e.mute = true;
                     break;
                 }
                 case '317': {
-                    var tokens = params.split(' ');
-                    this.alias('ECHO', '15o 07Idle15: ' + durationLong(Number(tokens[2])) + '');
-                    if (tokens[3]) this.alias('ECHO', '15o 07Signed on15: ' + BSIdent.prototype.asctime(tokens[3]));
+                    this.alias('ECHO', '15o 07Idle15: ' + durationLong(Number(params.word(2))) + '');
+                    if (params.word(3)) this.alias('ECHO', '15o 07Signed on15: ' + BSIdent.prototype.asctime(params.word(3)));
                     e.mute = true;
                     break;
                 }
@@ -889,33 +1128,67 @@ BSServer.prototype.onEvent = function (e) {
                     e.mute = true;
                     break;
                 }
+                case '321': {
+                    e.mute = true;
+                    if (!this.getWindow('@Channels')) this.alias('WINDOW @Channels');
+                    else this.alias('CLEAR @Channels');
+                    this.alias('ECHO', '@Channels', '* Updating list...');
+                    this.channelList = [];
+                    break;
+                }
+                case '322': {
+                    e.mute = true;
+                    var chan = params.word(1), users = Number(params.word(2)), topic = trailing;
+                    this.channelList.push([chan, users, topic]);
+                    break;
+                }
+                case '323': {
+                    e.mute = true;
+                    this.channelList.sort(function (a, b) { return a[1] < b[1] ? 1 : -1; });
+                    if (!this.getWindow('@Channels')) this.alias('WINDOW @Channels');
+                    else this.alias('CLEAR @Channels');
+                    this.getWindow('@Channels').bufferLimit = Infinity;
+                    for (var i = 0; i < this.channelList.length; i++) {
+                        this.alias('ECHO', '@Channels', this.channelList[i].join("\t"));
+                    }
+                    this.channelList = null;
+                    break;
+                }
                 case '330': {
-                    this.alias('ECHO', '15o 07Login15: ' + params.split(' ')[2] + '');
+                    this.alias('ECHO', '15o 07Login15: ' + params.word(2) + '');
                     e.mute = true;
                     break;
                 }
                 case '332': {
-                    var chan = this.ident.gettok(params, 2, 32), topic = trailing;
-                    this.proc.raw332(chan, topic);
+                    var chan = params.word(1), topic = trailing;
+                    if (this.getChan(chan).showTopic) this.proc.raw332(chan, topic);
                     e.mute = true;
                     BS.UI.updateTitle();
                     break;
                 }
                 case '333': {
-                    var chan = this.ident.gettok(params, 2, 32), nick = this.ident.gettok(params, 3, 32), time = this.ident.gettok(params, 4, 32);
-                    this.alias('ECHO', chan, BS.theme['raw.333'](nick, time));
-                    this.alias('ECHO', chan, '7————————————————————————————————— 1-07— ——— 1-15—— — 1——14—— ——— 1--14—');
+                    var chan = params.word(1), nick = params.word(2), time = params.word(3);
+                    var chanObj = this.getChan(chan);
+                    if (chanObj.showTopic) {
+                        this.alias('ECHO', chan, BS.theme['raw.333'](nick, time));
+                        this.alias('ECHO', chan, '7————————————————————————————————— 1-07— ——— 1-15—— — 1——14—— ——— 1--14—');
+                        chanObj.showTopic = false;
+                    }
                     e.mute = true;
                     break;
                 }
                 case '353': {
-                    var chan = this.ident.gettok(params, 3, 32), names = trailing.split(' ');
+                    var chan = params.word(2), names = trailing.split(' ');
                     this.proc.raw353(chan, names);
                     break;
                 }
                 case '366': {
-                    var chan = this.ident.gettok(params, 2, 32);
+                    var chan = params.word(1);
                     this.proc.raw366(chan);
+                    break;
+                }
+                case '367': {
+                    e.theme = [[params.word(1), '15o Bans: 15 ' + params.word(2) + ' 07by 15' + params.word(3) + ' 07on 15' + BSIdent.prototype.asctime(params.word(4))]];
                     break;
                 }
                 case '378': {
@@ -930,6 +1203,8 @@ BSServer.prototype.onEvent = function (e) {
                     e.mute = true;
                     break;
                 }
+                case '396': e.theme = [['Status', params.words(1) + ' ' + trailing]]; break;
+                case '422': e.theme = [['Status', trailing]]; break;
                 case '433': {
                     //fixme
                     var login = BS.sets.get('login');
@@ -943,14 +1218,20 @@ BSServer.prototype.onEvent = function (e) {
                     this.alias('RAW', 'NICK ' + this.nick + BS.util.rand(100, 999));
                     break;
                 }
+                case '495': {
+                    var matches = e.trailing.match(/^You must wait (\d+) seconds/);
+                    if (matches) setTimeout(function () { server.alias('JOIN', params.word(1)); }, Number(matches[1]) * 1000);
+                    break;
+                }
                 case '671': {
                     this.alias('ECHO', '15o07 SSL15: Using a secure connection');
                     e.mute = true;
                     break;
                 }
+                case '900': e.theme = [['Status', trailing]]; break;
             }
-            if (!e.mute) {
-                this.alias('ECHO', BS.raws.getWindow(command), prefix + ' | ' + command + ' | ' + params + ' | ' + trailing);
+            if (!e.mute && !e.theme.length) {
+                this.alias('ECHO', BS.raws.getWindow(command), params.words(1) + ' ' + trailing);
             }
             break;
         }
@@ -991,14 +1272,29 @@ BSServer.prototype.onEvent = function (e) {
         }
         case 'TEXT': {
             var nick = e.nick, text = e.text, chan = e.chan;
+            var match = text.match(/^\[(\d\d:\d\d:\d\d)\] (.+)$/), timestamp;
+            if (match) {
+                timestamp = BS.theme.time(match[1]);
+                text = match[2];
+            }
+            else timestamp = BSIdent.prototype.timestamp();
             if (chan) {
-                this.alias('ECHO', chan, BS.theme.msg(chan ? this.getChanUser(chan, nick).prefix : '', nick, BS.UI.highlight.search(this, text, nick, chan)));
-                this.getChanUser(chan, nick).lastMessage = Date.now();
+                if (document.visibilityState != 'visible') BS.UI.flash.perform(chan + ' ' + nick + ' ' + text);
+                var user = this.getChanUser(chan, nick), prefix = user ? user.prefix : '';
+                if (nick == '*buffextras') {
+                    var matches;
+                    if (matches = text.match(/^(.+)!(.+) joined$/)) BS.UI.echo(timestamp + BS.theme.join(matches[1], matches[2]), this.getWindow(chan), {});
+                    else if (matches = text.match(/^(.+)!(.+) quit with message: (.+)/)) BS.UI.echo(timestamp + BS.theme.quit(matches[1], matches[3]), this.getWindow(chan), {});
+                    else BS.UI.echo(timestamp + BS.theme.msg(prefix, nick, BS.UI.highlight.search(this, text, nick, chan)), this.getWindow(chan), {});
+                }
+                else BS.UI.echo(timestamp + BS.theme.msg(prefix, nick, BS.UI.highlight.search(this, text, nick, chan)), this.getWindow(chan), {});
+                var user = this.getChanUser(chan, nick);
+                if (user) user.lastMessage = Date.now();
             }
             else {
                 if (!this.getQuery(nick)) this.addQuery(nick);
                 BS.UI.highlight.perform(this, text, nick);
-                this.alias('ECHO', nick, BS.theme.msg('', nick, text));
+                BS.UI.echo(timestamp + BS.theme.msg('', nick, text), this.getWindow(nick), {});
             }
             break;
         }
@@ -1013,6 +1309,11 @@ BSServer.prototype.onEvent = function (e) {
                 this.alias('ECHO', nick, BS.theme.action('', nick, text));
             }
             break;
+        }
+    }
+    if (!e.mute) {
+        for (var i = 0; i < e.theme.length; i++) {
+            this.alias.apply(this, ['ECHO'].concat(e.theme[i]));
         }
     }
     // callbacks after internal processing
@@ -1032,8 +1333,13 @@ BSServer.prototype.remQuery = function (nick) {
 };
 BSServer.prototype.setMe = function (me) {
     this.me = me;
-    this.win.button.element.value = this.network + ' ' + me;
+    this.win.button.element.value = this.network + ' ' + this.me;
 };
+BSServer.prototype.setNetwork = function (network) {
+    this.network = network;
+    this.win.button.element.value = this.network + ' ' + this.me;
+};
+
 
 function BSAlias(server, alias, text, tokens) {
     this.server = server;
@@ -1138,7 +1444,7 @@ BSAlias.prototype.mode = function () {
 };
 BSAlias.prototype.msg = function () {
     var targets = this.tokens[0], text = this.tokens.words(1);
-    this.server.alias('RAW', 'PRIVMSG ' + targets + ' :' + text);
+    this.server.alias('RAW', 'PRIVMSG ' + targets + ' :' + (/^\//.test(text) ? '/' : '') + text);
     targets = targets.split(',');
     for (var i = 0; i < targets.length; i++) {
         var chan = BS.util.isChanName(targets[i]) ? targets[i] : null;
@@ -1163,7 +1469,7 @@ BSAlias.prototype.part = function () {
 };
 BSAlias.prototype.p = BSAlias.prototype.part;
 BSAlias.prototype.ping = function () {
-    this.server.alias('CTCP', this.tokens[0] + ' PING ' + BS.util.time());
+    this.server.alias('CTCP', this.tokens[0] + ' PING ' + Date.now());
 };
 BSAlias.prototype.protect = function () {
     this.server.alias('MODE', BS.util.applyMode('+a', this.text));
@@ -1335,6 +1641,7 @@ BSIdent.prototype.snicks = function (chan) {
 };
 BSIdent.prototype.strip = function (text) { return text.replace(/(1[0-5]|0?[0-9](,(1[0-5]|0?[0-9]))?)?|[]/g, ''); };
 BSIdent.prototype.style = function () { return ''; };
+BSIdent.prototype.timestamp = function () { return BS.theme.timestamp(BS.util.clock()); };
 BSIdent.prototype.unmask = function (mask, type) {
     var regs = mask.match(/(.+)!(.+)@(.+)/);
     return regs ? regs[type || 1] : mask;
@@ -1390,6 +1697,7 @@ function BSChan(name, win) {
     this.win = win;
     this.nicksMatch = null;
     this.namesUpdated = true;
+    this.showTopic = true;
 }
 BSChan.prototype.updateNicksMatch = function () {
     var nicks = [];
@@ -1438,6 +1746,11 @@ function BSQuery(nick, win) {
     this.nick = nick;
     this.win = win;
 }
+BSQuery.prototype.rename = function (newnick) {
+    BS.log('renaming: ', this, newnick);
+    this.nick = newnick;
+    this.win.setLabel(newnick);
+};
 
 function BSEditbox(label, win) {
     var parent = this;
@@ -1451,10 +1764,9 @@ function BSEditbox(label, win) {
     this.win = win;
     this.obj = document.createElement("textarea");
     this.obj.setAttribute('id', 'editbox_' + label);
-    //this.obj.setAttribute('rows', '3');
-    this.obj.style.height = '18px';
     document.getElementById('editboxes').appendChild(this.obj);
     this.obj.addEventListener("keydown", function (e) { parent.onKeyDown(e); }, true);
+    this.obj.addEventListener("input", function (e) { parent.onChange(e); }, true)
 }
 BSEditbox.prototype.destroy = function () {
     this.obj.parentNode.removeChild(this.obj);
@@ -1479,10 +1791,11 @@ BSEditbox.prototype.onInput = function (e) {
         if (this.history.length == 32) this.history.shift();
         this.historyIndex = 0;
         var regs;
-        if (!e.ctrlKey && (regs = text.match(/^\/\/(.+)$/))) {
+        if (e.ctrlKey) this.win.server.alias('SAY', text);
+        else if (regs = text.match(/^\/\/(.+)$/)) {
             this.win.server.eval(regs[1]);
         }
-        else if (!e.ctrlKey && (regs = text.match(/^\/(.+)$/))) {
+        else if (regs = text.match(/^\/(.+)$/)) {
             this.win.server.call(regs[1]);
         }
         else this.win.server.alias('SAY', text);
@@ -1490,6 +1803,11 @@ BSEditbox.prototype.onInput = function (e) {
     this.setText("");
     this.obj.name = "editbox_"+Math.random();
     return false;
+};
+BSEditbox.prototype.onChange = function (e) {
+    var lines = (this.obj.value.match(/\n/g) || []).length + 1;
+    this.obj.setAttribute('rows', lines);
+    this.obj.parentNode.style['min-height'] = (18 * lines + 6) + 'px';
 };
 BSEditbox.prototype.onKeyDown = function (e) {
     //BS.log(e.keyCode+" "+e.ctrlKey);
@@ -1544,18 +1862,24 @@ BSEditbox.prototype.onKeyDown = function (e) {
         }
         //up key
         case 38: {
-            if (!this.history.length) break;
-            this.historyIndex++;
-            if (this.historyIndex > this.history.length) this.historyIndex = 1;
-            this.setText(this.history[this.history.length - this.historyIndex]);
+            if (!/\n/.test(this.obj.value.slice(0, this.obj.selectionEnd))) {
+                if (!this.history.length) break;
+                this.historyIndex++;
+                if (this.historyIndex > this.history.length) this.historyIndex = 1;
+                this.setText(this.history[this.history.length - this.historyIndex]);
+                e.preventDefault();
+            }
             break;
         }
         //down key
         case 40: {
-            if (!this.history.length) break;
-            this.historyIndex--;
-            if (this.historyIndex < 1) this.historyIndex = this.history.length;
-            this.setText(this.history[this.history.length - this.historyIndex]);
+            if (!/\n/.test(this.obj.value.slice(this.obj.selectionEnd))) {
+                if (!this.history.length) break;
+                this.historyIndex--;
+                if (this.historyIndex < 1) this.historyIndex = this.history.length;
+                this.setText(this.history[this.history.length - this.historyIndex]);
+                e.preventDefault();
+            }
             break;
         }
         default: {
@@ -1565,6 +1889,7 @@ BSEditbox.prototype.onKeyDown = function (e) {
 };
 BSEditbox.prototype.setText = function (text) {
     this.obj.value = text;
+    this.onChange();
     this.focus();
 };
 
@@ -1625,6 +1950,14 @@ BSSwitchbar.prototype.remButton = function (label) {
     delete(this.buttons[label.toLowerCase()]);
     this.update();
 };
+BSSwitchbar.prototype.relabelButton = function (oldLabel, newLabel) {
+    var button = this.buttons[oldLabel.toLowerCase()];
+    button.label = newLabel;
+    this.buttons[newLabel.toLowerCase()] = button;
+    button.element.setAttribute('value', newLabel);
+    delete(this.buttons[oldLabel.toLowerCase()]);
+    this.update();
+};
 BSSwitchbar.prototype.destroy = function () {
     //todo: deselect possible active window
     this.element.parentNode.removeChild(this.element);
@@ -1645,16 +1978,14 @@ BSSwitchbar.prototype.update = function () {
     }
 };
 BSSwitchbar.prototype.deselected = function (button) {
-    button.element.style.backgroundColor = '';
-    button.element.style.color = '';
+    button.element.classList.remove('selected');
 };
 BSSwitchbar.prototype.selected = function (button) {
-    button.element.style.backgroundColor = 'rgb(30, 144, 255)';
-    button.element.style.color = '#fff';
-    button.status = 0;
+    button.element.classList.add('selected');
+    this.updateButton(button, 0, true);
 };
 BSSwitchbar.prototype.newLine = function (label) {
-    BS.log('newLine:', label, this.buttons);
+    // BS.log('newLine:', label, this.buttons);
     var win = this.buttons[label.toLowerCase()].win;
     if (BSWindow.active != win) this.updateButton(win.button, 1);
 };
@@ -1669,9 +2000,13 @@ BSSwitchbar.prototype.highlight = function (label) {
         if (BSWindow.active != win) this.updateButton(win.button, 3);
     }
 };
-BSSwitchbar.prototype.updateButton = function (button, status) {
-    button.status = Math.max(button.status, status);
-    button.element.style.color = ['', '#0080ff', '#ff0000', '#009000'][button.status];
+BSSwitchbar.prototype.updateButton = function (button, newStatus, force) {
+    if (newStatus > button.status || force) {
+        var statusNames = ['', 'newLine', 'newMsg', 'highlight'];
+        if (button.status) button.element.classList.remove(statusNames[button.status]);
+        if (newStatus) button.element.classList.add(statusNames[newStatus]);
+        button.status = newStatus;
+    }
 };
 
 function BSNicklist(label, win) {
@@ -1696,6 +2031,8 @@ BSNicklist.prototype.update = function () {
             var el = document.createElement("option");
             el.appendChild(document.createTextNode(prefix + user.nick));
             el.setAttribute('data-user', user.nick);
+            var prefixColor = BS.theme.prefixColor(prefix);
+            if (prefixColor) el.className = 'c' + prefixColor;
             nicklist.push({el: el, prefix: prefix, user: user.nick});
         }
         nicklist.sort(function (a, b) {
@@ -1720,6 +2057,8 @@ BSNicklist.prototype.selected = function () {
 };
 
 function BSWindow(label, server) {
+    this.bufferLimit = 1050;//600;
+    this.bufferRestore = 1000;//500;
     server.windows[label.toLowerCase()] = this;
     this.label = label;
     this.server = server;
@@ -1739,22 +2078,27 @@ function BSWindow(label, server) {
     // last thing
     this.select();
 }
+
 BSWindow.active = null;
 BSWindow.stack = [];
 BSWindow.wid = 0;
 BSWindow.windows = {};
+
+BSWindow.prototype.setLabel = function (newLabel) {
+    this.server.windows[newLabel.toLowerCase()] = this;
+    delete(this.server.windows[this.label.toLowerCase()]);
+    this.server.switchbar.relabelButton(this.label, newLabel);
+    this.label = newLabel;
+};
 BSWindow.prototype.addLine = function (text) {
     var msgBox = this.msgBox;
     //remove some lines if it gets too big
     var lines = msgBox.childNodes.length;
-    if (lines > 300) {
-        for (var i = lines; i > 250; i--) {
+    if (lines > this.bufferLimit) {
+        for (var i = lines; i > this.bufferRestore; i--) {
             msgBox.removeChild(msgBox.firstChild);
         }
     }
-
-    //add timestamp
-    text = '15' + BS.util.clock() + '07| ' + text;
 
     //save to permanent logger
     BS.plogs.add(this.server.network, this.label, text);
@@ -1808,7 +2152,7 @@ BSWindow.prototype.addLine = function (text) {
 BSWindow.prototype.clear = function () {
     var msgBox = this.msgBox;
     while (msgBox.firstChild) msgBox.removeChild(msgBox.firstChild);
-    this.button.status = 0;
+    this.server.switchbar.updateButton(this.button, 0, true);
 };
 BSWindow.prototype.close = function () {
     //deselect window
@@ -1825,6 +2169,7 @@ BSWindow.prototype.close = function () {
     if (this.nicklist) this.nicklist.destroy();
     this.editbox.destroy();
     delete(BSWindow.windows[this.wid]);
+    delete(this.server.windows[this.label.toLowerCase()]);
 };
 BSWindow.prototype.deselect = function () {
     var active = BSWindow.stack.pop();
@@ -1864,7 +2209,7 @@ BSPLogger.prototype.add = function (network, label, text) {
     else this.logs[id].push(text);
 };
 BSPLogger.prototype.store = function () {
-    BS.log('Storing logs:', this.logs);
+    // BS.log('Storing logs:', this.logs);
     for (var i in this.logs) if (this.logs[i].length) {
         var id = 'plogs_' + i;
         try {
@@ -1958,6 +2303,14 @@ Array.prototype.replace = function (oldvalue, newvalue) {
 };
 Array.prototype.words = function (begin, end) {
     return this.slice(begin, end).join(' ');
+};
+String.prototype.words = function (begin, end) {
+    if (!this._words) this._words = this.split(' ');
+    return this._words.slice(begin, end).join(' ');
+};
+String.prototype.word = function (index) {
+    if (!this._words) this._words = this.split(' ');
+    return (index < 0 ? this._words[this._words.length + index] : this._words[index]) || '';
 };
 
 function durationLong(s) {
