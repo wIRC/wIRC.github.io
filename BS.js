@@ -582,7 +582,7 @@ alias hi say Hi $1-!
             var fontSize = Number(sets.fontSize);
             style.innerHTML = '';
             if (fontSize) style.innerHTML += 'body { font-size: ' + fontSize + 'px; }\n';
-            if (!sets.showEmbeds) style.innerHTML += '.expando { display: none; }\n';
+            if (!sets.showEmbeds) style.innerHTML += '.embed { display: none; }\n';
         },
         updateTitle: function () {
             var active = BSWindow.active, title = active.label, chan = null;
