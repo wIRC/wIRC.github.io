@@ -16,7 +16,7 @@ input, textarea, select {
 #title {
     color: #fff;
 }
-#body, #scrollbox, #nicklist select {
+#body, #middle, #nicklist select {
     border-color: #4c4c4c;
 }
 .hl {
@@ -46,4 +46,7 @@ input.highlight {
 }
 ::-webkit-scrollbar-track-piece {
     background-color: #2e3136;
+}
+hr {
+    background-color: #f04747;
 }

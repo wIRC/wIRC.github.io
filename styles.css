@@ -62,12 +62,16 @@ u {
     outline: 0;
     width: 150px;
 }
-#scrollbox {
+#middle {
     border-left: 1px solid;
+    display: flex;
+    flex-direction: column;
     flex-grow: 1;
-    line-height: 1.3em;
+}
+#scrollbox {
     margin-left: 1px;
-    padding: 1px 0 0 3px;
+    padding: 1px 0 0 5px;
+    flex-grow: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -76,11 +80,11 @@ u {
     overflow-wrap: break-word;
 }
 #scrollbox p {
-    margin: 1px;
+    margin: 3px 0 3px 0;
 }
 #switchbar {
     vertical-align: top;
-    margin-top: 2px;
+    margin: 2px;
 }
 #switchbar input {
     margin-bottom: 2px;
@@ -92,7 +96,16 @@ u {
     flex-direction: column;
     justify-content: center;
     align-items: stretch;
-    min-height: 26px;
+    min-height: 50px;
+}
+#editboxes textarea {
+    padding: 8px;
+    margin: 6px;
+    height: 100%;
+    line-height: 20px;
+    font-size: 16px;
+    outline: none;
+    border-radius: 3px;
 }
 
 .b { font-weight: bold; }
@@ -156,21 +169,20 @@ u {
     width: 95%;
     font-family: monospace;
 }
-#buttons {
-    background-color: #f0f0f0;
-}
-#buttons button {
-    background-color: transparent;
+#buttons > span {
     padding: 0;
-    width: 33px;
-    height: 26px;
-    border: 1px;
-}
-#buttons button:hover {
-    border: solid 1px #c0dcf3;
-}
-.buttons img {
+    width: 20px;
+    height: 20px;
     display: block;
+    margin: 3px;
+    opacity: 0.33;
+}
+#buttons > span:hover {
+    opacity: 1;
+}
+#settingsButton {
+    background-image: url("sets.svg");
+    background-size: contain;
 }
 
 .contextmenu-custom {
@@ -192,10 +204,17 @@ u {
     max-height: 225px;
 }
 
+
 ::-webkit-scrollbar {
     width: 12px;
 }
 ::-webkit-scrollbar-thumb {
     background-clip: padding-box;
     border-radius: 7px;
+}
+
+hr {
+    border: none;
+    margin: 8px 10px 8px 10px;
+    height: 1px;
 }

@@ -254,6 +254,12 @@ alias hi say Hi $1-!
             }
         });
 
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === 'visible') {
+                BSWindow.active.separator = false;
+            }
+        });
+
         // call start event on first server
         for (var i in BS.servers) {
             BS.servers[i].event('START');
@@ -641,22 +647,6 @@ alias hi say Hi $1-!
             //b k i r o u
             if (!str) return "";
 
-            // embeds
-            var matches;
-            var embed = '';
-            if (matches = str.match(/(https?:\/\/i\.imgur\.com\/[^.]+)\.gifv/i)) {
-                embed = '<video width="400" height="225" src="' + matches[1] + '.mp4" controls="controls" loop="" preload="metadata"></video>';
-            }
-            else if (matches = str.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)/i)) {
-                embed = '<a href="' + matches[0] + '" target="_blank"><img src="' + matches[0] + '" /></a>';
-            }
-            else if ((matches = str.match(/https?:\/\/(?:[^.]+)\.youtube\.com\/watch\?v=([^ ]+)/i)) || (matches = str.match(/https?:\/\/youtu\.be\/([^ ]+)/i))) {
-                embed = '<iframe width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + '" frameborder="0" allowfullscreen></iframe>';
-            }
-            else if (matches = str.match(/https?:\/\/[^ ]+\.(?:mp4)/i)) {
-                embed = '<video width="400" height="225" src="' + matches[0] + '" controls="controls" loop="" preload="metadata"></video>';
-            }
-
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="b">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="u">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="i">$1</u>');
@@ -675,8 +665,6 @@ alias hi say Hi $1-!
                 return '<u class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</u>';
             });
             str = str.replace(/|/g, '');
-
-            if (embed) str += '<u class="embed">' + embed + '</u>';
 
             return str;
         },
@@ -1161,7 +1149,7 @@ BSServer.prototype.onEvent = function (e) {
                 }
                 case '332': {
                     var chan = params.word(1), topic = trailing;
-                    if (this.getChan(chan).showTopic) this.proc.raw332(chan, topic);
+                    this.proc.raw332(chan, topic);
                     e.mute = true;
                     BS.UI.updateTitle();
                     break;
@@ -1274,7 +1262,7 @@ BSServer.prototype.onEvent = function (e) {
             var nick = e.nick, text = e.text, chan = e.chan;
             var match = text.match(/^\[(\d\d:\d\d:\d\d)\] (.+)$/), timestamp;
             if (match) {
-                timestamp = BS.theme.time(match[1]);
+                timestamp = BS.theme.timestamp(match[1]);
                 text = match[2];
             }
             else timestamp = BSIdent.prototype.timestamp();
@@ -1659,8 +1647,9 @@ function BSProc(server) {
     this.server = server;
 }
 BSProc.prototype.raw332 = function (chan, topic) {
-    this.server.getChan(chan).topic = topic;
-    this.server.alias('ECHO', chan, BS.theme['raw.332'](topic));
+    var chanObj = this.server.getChan(chan);
+    chanObj.topic = topic;
+    if (chanObj.showTopic) this.server.alias('ECHO', chan, BS.theme['raw.332'](topic));
 };
 BSProc.prototype.raw353 = function (chan, names) {
     this.server.getChan(chan).addNames(names);
@@ -1764,6 +1753,8 @@ function BSEditbox(label, win) {
     this.win = win;
     this.obj = document.createElement("textarea");
     this.obj.setAttribute('id', 'editbox_' + label);
+    this.obj.setAttribute('placeholder', 'Enter message...');
+    this.obj.setAttribute('rows', 1);
     document.getElementById('editboxes').appendChild(this.obj);
     this.obj.addEventListener("keydown", function (e) { parent.onKeyDown(e); }, true);
     this.obj.addEventListener("input", function (e) { parent.onChange(e); }, true)
@@ -1807,7 +1798,7 @@ BSEditbox.prototype.onInput = function (e) {
 BSEditbox.prototype.onChange = function (e) {
     var lines = (this.obj.value.match(/\n/g) || []).length + 1;
     this.obj.setAttribute('rows', lines);
-    this.obj.parentNode.style['min-height'] = (18 * lines + 6) + 'px';
+    this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 2 + 12) + 'px';
 };
 BSEditbox.prototype.onKeyDown = function (e) {
     //BS.log(e.keyCode+" "+e.ctrlKey);
@@ -1987,7 +1978,14 @@ BSSwitchbar.prototype.selected = function (button) {
 BSSwitchbar.prototype.newLine = function (label) {
     // BS.log('newLine:', label, this.buttons);
     var win = this.buttons[label.toLowerCase()].win;
-    if (BSWindow.active != win) this.updateButton(win.button, 1);
+    var isActive = BSWindow.active == win;
+    if (!isActive) {
+        this.updateButton(win.button, 1);
+    }
+    if (!win.separator && (!isActive || document.visibilityState !== 'visible')) {
+        win.separator = true;
+        win.addSeparator();
+    }
 };
 BSSwitchbar.prototype.newMsg = function (label) {
     var win = this.buttons[label.toLowerCase()].win;
@@ -2005,6 +2003,7 @@ BSSwitchbar.prototype.updateButton = function (button, newStatus, force) {
         var statusNames = ['', 'newLine', 'newMsg', 'highlight'];
         if (button.status) button.element.classList.remove(statusNames[button.status]);
         if (newStatus) button.element.classList.add(statusNames[newStatus]);
+        else button.win.separator = false;
         button.status = newStatus;
     }
 };
@@ -2074,6 +2073,7 @@ function BSWindow(label, server) {
 
     this.nicklist = /^#/.test(label) && new BSNicklist(label, this);
     this.editbox = new BSEditbox(label, this);
+    this.separator = false;
 
     // last thing
     this.select();
@@ -2092,7 +2092,11 @@ BSWindow.prototype.setLabel = function (newLabel) {
 };
 BSWindow.prototype.addLine = function (text) {
     var msgBox = this.msgBox;
-    //remove some lines if it gets too big
+
+    // update button and add line separator (before adding the line)
+    this.server.switchbar.newLine(this.label);
+
+    // remove some lines if it gets too big
     var lines = msgBox.childNodes.length;
     if (lines > this.bufferLimit) {
         for (var i = lines; i > this.bufferRestore; i--) {
@@ -2100,18 +2104,44 @@ BSWindow.prototype.addLine = function (text) {
         }
     }
 
-    //save to permanent logger
+    // save to permanent logger
     BS.plogs.add(this.server.network, this.label, text);
 
-    //format text (to HTML)
+    // embeds
+    var matches;
+    var embed = '';
+    if (matches = text.match(/https?:(\/\/i\.imgur\.com\/[^.]+)\.gifv/i)) {
+        embed = '<video width="400" height="225" src="' + matches[1] + '.mp4" controls="controls" preload="metadata"></video>';
+    }
+    else if (matches = text.match(/https?:\/\/imgur\.com\/a\/([^ /]+)/i)) {
+        //embed = '<iframe src="http://imgur.com/a/' + matches[1] + '/embed?pub=true"></iframe>';
+        embed = '<blockquote class="imgur-embed-pub" lang="en" data-id="a/' + matches[1] + '"><a href="//imgur.com/' + matches[1] + '"></a></blockquote>';
+        var script = document.createElement('script');
+        script.setAttribute('src', '//s.imgur.com/min/embed.js');
+        document.head.appendChild(script);
+    }
+    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)/i)) {
+        embed = '<a href="' + matches[0] + '" target="_blank"><img src="' + matches[0] + '" /></a>';
+    }
+    else if ((matches = text.match(/https?:\/\/(?:[^.]+)\.youtube\.com\/watch\?v=([^ ]+)/i)) || (matches = text.match(/https?:\/\/youtu\.be\/([^ ]+)/i))) {
+        embed = '<iframe width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + '" frameborder="0" allowfullscreen></iframe>';
+    }
+    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:mp4)/i)) {
+        embed = '<video width="400" height="225" src="' + matches[0] + '" controls="controls" preload="metadata"></video>';
+    }
+
+    // format text (to HTML)
     text = BS.util.ircformat(BS.util.htmlEntities(text));
 
-    //add to DOM
+    // add embed
+    if (embed) text += '<u class="embed">' + embed + '</u>';
+
+    // add to DOM
     var line = document.createElement("p");
     line.innerHTML = text;
 
     /*
-    //find all text nodes in the line
+    // ind all text nodes in the line
     var textNodes = (function (){
         var n, a = [], walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT, null, false);
         while (n = walk.nextNode()) a.push(n);
@@ -2147,7 +2177,14 @@ BSWindow.prototype.addLine = function (text) {
     this.msgBox.appendChild(line); //append line
     scrollbox.scrollTop = scrolled ? 100000 : scrollTop; //restore scroll or scroll to bottom
 
-    this.server.switchbar.newLine(this.label);
+};
+BSWindow.prototype.addSeparator = function () {
+    // only add separator if window is not empty
+    if (this.msgBox.childNodes.length) {
+        var seps = this.msgBox.getElementsByTagName('hr');
+        for (var i = 0; i < seps.length; i++) seps[i].parentElement.removeChild(seps[i]);
+        this.msgBox.appendChild(document.createElement("hr"));
+    }
 };
 BSWindow.prototype.clear = function () {
     var msgBox = this.msgBox;
