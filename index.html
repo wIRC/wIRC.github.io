@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
         <link rel="stylesheet" type="text/css" href="styles.css" />
-        <link rel="stylesheet" type="text/css" href="scheme.css" />
+        <link rel="stylesheet" type="text/css" href="scheme-dark.css" id="scheme" />
         <script src="contextMenu/jquery-1.8.2.min.js" type="text/javascript"></script>
         <script src="contextMenu/src/jquery.ui.position.js" type="text/javascript"></script>
         <script src="contextMenu/src/jquery.contextMenu.js" type="text/javascript"></script>
@@ -13,6 +13,7 @@
         <script src="BS.js" charset="UTF-8"></script>
         <script src="popups.js" charset="UTF-8" async></script>
         <script src="aliases.js" charset="UTF-8" async></script>
+        <script src="sets.js" charset="UTF-8" async></script>
         <script src="mircscript/parser.js" charset="UTF-8"></script>
         <script src="mircscript/mircscript.js" charset="UTF-8"></script>
         <script src="touch.js" charset="UTF-8"></script>
@@ -39,7 +40,16 @@
         </span>
         <div id="modal" class="modal">
             <div id="modal-settings" class="modal-content">
-                <p>Your script:</p>
+                <p>Font size: <input type="range" min="5" max="36" id="setsFontSize" /><span id="setsFontSizeValue"></span> px</p>
+                <p><label><input type="checkbox" id="setsShowEmbeds" /> Show images and videos</label></p>
+                <p>
+                    <form>
+                        Theme:
+                        <label><input type="radio" name="scheme" id="setsSchemeDark"> Dark</label>
+                        <label><input type="radio" name="scheme" id="setsSchemeBlack"> Black</label>
+                    </form>
+                </p>
+                <p>Custom script:</p>
                 <textarea rows="12" id="userScript"></textarea><br />
                 <p>
                     <a id="downloadBackup" target="_blank" download="wIRC-backup.json">Download settings backup.</a>
@@ -49,8 +59,6 @@
                 <p>
                     <a id="downloadLogs" href="javascript:">Download logs.</a>
                 </p>
-                <p>Font size: <input type="range" min="5" max="36" id="setsFontSize" /><span id="setsFontSizeValue"></span> px</p>
-                <p><label><input type="checkbox" id="setsShowEmbeds" /> Show images and videos</label></p>
                 <button id="settingsOkButton">OK</button>
                 <button id="settingsApplyButton">Apply</button>
                 <button id="settingsCancelButton">Cancel</button>

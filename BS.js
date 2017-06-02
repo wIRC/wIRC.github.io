@@ -3,10 +3,12 @@ var BS = {
     logs: null,
     servers: {},
     eventHandlers: [],
+    prefs: {},
     variables: {},
     scriptAliases: {},
     onLoad: function () {
         //init
+        BS.sets.loadPrefs();
         BS.UI.updateStyle();
         BS.logs = new BSLogger();
         BS.plogs = new BSPLogger();
@@ -135,112 +137,7 @@ var BS = {
             }
         });
 
-        // settings window
-        var settingsButton = document.getElementById("settingsButton");
-        var closeButton = document.getElementsByClassName("closeButton")[0];
-        var setsFontSize = document.getElementById('setsFontSize');
-        var setsFontSizeValue = document.getElementById('setsFontSizeValue');
-        var setsShowEmbeds = document.getElementById('setsShowEmbeds');
-
-        var sets = BS.sets.get('sets') || {};
-        if (!sets.userScript) sets.userScript = '';
-        if (!sets.fontSize) sets.fontSize = '';
-        if (sets.showEmbeds === undefined) sets.showEmbeds = true;
-        var applyUserScript = function (userScript) {
-            if (!userScript) return BS.eventHandlers[0] = null;
-            try {
-                var code = `(function (e) {
-                    var server = this;
-                    var vars = e;
-                    var $$ = function (str) { server.eval(str, e); };
-                    ${BSParser.parseProgramSource(userScript)}
-                })`;
-                BS.log('Compiled UserScript:', code);
-                BS.eventHandlers[0] = eval(code);
-                // call load and start event on first server
-                for (var i in BS.servers) {
-                    BS.servers[i].event('LOAD');
-                    BS.servers[i].event('START');
-                    break;
-                }
-                return null;
-            } catch (e) { BS.log('Error on userScript:', e); return e; }
-        };
-        applyUserScript(sets.userScript);
-        settingsButton.onclick = function() {
-            document.getElementById('userScript').value = sets.userScript;
-            setsFontSizeValue.innerHTML = setsFontSize.value = sets.fontSize;
-            setsShowEmbeds.checked = sets.showEmbeds;
-            var downloadBackup = document.getElementById('downloadBackup');
-            downloadBackup.href = BS.sets.backup();
-            BS.UI.modal.show('settings');
-        };
-        var settingOkButtonCallback = function (close) {
-            var userScript = document.getElementById('userScript').value;
-            var error = applyUserScript(userScript);
-            if (!error || confirm('Error on userscript:\n\n' + error.valueOf()+'\n\nSave anyway?')) {
-                sets.userScript = userScript;
-                sets.fontSize = setsFontSize.value;
-                sets.showEmbeds = setsShowEmbeds.checked;
-                BS.sets.set('sets', sets);
-                BS.UI.updateStyle();
-                if (close) BS.UI.modal.hide('settings');
-            }
-        };
-        document.getElementById('settingsOkButton').addEventListener('click', function () { settingOkButtonCallback(true); });
-        document.getElementById('settingsApplyButton').addEventListener('click', function () { settingOkButtonCallback(); });
-        document.getElementById('settingsCancelButton').addEventListener('click', function () {
-            BS.UI.modal.hide('settings');
-        });
-        document.getElementById('userScript').placeholder = `Use JavaScript syntax
-The code here will be called for every event.
-Available objects:
-    * e: The Event (contains: e.type, e.nick, e.chan, etc)
-    * server: The Server (contains: server.call, server.ident, etc)
-    * $$('<mIRC syntax>'): Evaluates mIRC scripting syntax.
-You can also use mIRC scripting syntax (limited support).
-
-Example:
-if (e.type == 'TEXT' && e.text == 'hi') $$('timer 1 1 msg # Hi $nick!');
-on *:text:*bye*:#: msg # bye bye $nick!
-alias hi say Hi $1-!
-`;
-
-        document.getElementById('restoreBackup').addEventListener('change', function (e) {
-            var f = e.target.files[0];
-            if (f) {
-                if (confirm('Restoring settings from: \''+ f.name +'\'\nWarning: This will replace current settings.')) {
-                    var r = new FileReader();
-                    r.onload = function (e) {
-                        var contents = e.target.result;
-                        try {
-                            BS.sets.restore(contents);
-                            alert('The settings were restored from the file.');
-                        } catch (e) {
-                            alert("Error: " + e.message);
-                        }
-                    };
-                    r.readAsText(f);
-                }
-                //e.target.type = ''; // clear selected file
-                //e.target.type = 'file';
-            }
-        }, false);
-
-
-
-        document.getElementById('downloadLogs').addEventListener('click', function () {
-            if (confirm("After the download the logs will be deleted.")) {
-                BSPLogger.prototype.download();
-            }
-        });
-
-        setsFontSize.addEventListener('input', function () {
-            setsFontSizeValue.innerHTML = setsFontSize.value;
-        });
-
         addEventListener("beforeunload", BS.onUnload);
-
         addEventListener("keydown", function (e) {
             // F12
             if (e.keyCode == 123 && !e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -258,7 +155,7 @@ alias hi say Hi $1-!
             if (document.visibilityState === 'visible') {
                 BSWindow.active.separator = false;
             }
-        });
+        }, false);
 
         // call start event on first server
         for (var i in BS.servers) {
@@ -277,6 +174,18 @@ alias hi say Hi $1-!
         BS.plogs.store();
     },
     log: console.log.bind(console, 'BS'),
+    /*prefs: {
+        data: null,
+        get: function (name) {
+
+        },
+        set: function (name, value) {
+
+        },
+        init: function () {
+            BS.prefs.data = BS.sets.get('sets');
+        }
+    },*/
     sets: {
         get: function (name) {
             try {
@@ -336,6 +245,19 @@ alias hi say Hi $1-!
             }
             BS.sets.set('state', {servers: servers, variables: BS.variables});
         },
+        loadPrefs: function () {
+            var defaultPrefs = {
+                userScript: '',
+                fontSize: 15,
+                showEmbeds: true,
+                scheme: "dark"
+            };
+            BS.prefs = BS.sets.get("sets") || {};
+            for (var i in defaultPrefs) if (!(i in BS.prefs)) BS.prefs[i] = defaultPrefs[i];
+        },
+        savePrefs: function () {
+            BS.sets.set("sets", BS.prefs);
+        },
         backup: function () {
             var sets = {};
             for (var i in localStorage) {
@@ -351,6 +273,7 @@ alias hi say Hi $1-!
                 data = JSON.parse(data);
             } catch (e) { throw new Error('The provided file is not a valid JSON file.'); }
             for (var i in data) BS.sets.set(i, data[i]);
+            BS.sets.loadPrefs();
         }
     },
     raws: {
@@ -417,7 +340,7 @@ alias hi say Hi $1-!
             return '15o 07Set by15: ' + nick + ' 07on15: ' + BSIdent.prototype.asctime(time);
         },
         timestamp: function (clock) {
-            return '15' + clock + '07| ';
+            return '14' + clock + '07| ';
         },
         mode: function (nick, modes) {
             return '15o Mode: 07' + nick + ' 15sets mode07: ' + modes;
@@ -584,11 +507,9 @@ alias hi say Hi $1-!
         },
         updateStyle: function () {
             var styleObj = document.getElementById('style');
-            var sets = BS.sets.get('sets') || {};
-            var fontSize = Number(sets.fontSize);
-            style.innerHTML = '';
-            if (fontSize) style.innerHTML += 'body { font-size: ' + fontSize + 'px; }\n';
-            if (!sets.showEmbeds) style.innerHTML += '.embed { display: none; }\n';
+            styleObj.innerHTML = 'body { font-size: ' + BS.prefs.fontSize + 'px; }\n';
+            if (!BS.prefs.showEmbeds) styleObj.innerHTML += '.embed { display: none; }\n';
+            document.getElementById("scheme").setAttribute("href", BS.prefs.scheme == "dark" ? "scheme-dark.css" : "scheme-black.css");
         },
         updateTitle: function () {
             var active = BSWindow.active, title = active.label, chan = null;
@@ -1798,7 +1719,7 @@ BSEditbox.prototype.onInput = function (e) {
 BSEditbox.prototype.onChange = function (e) {
     var lines = (this.obj.value.match(/\n/g) || []).length + 1;
     this.obj.setAttribute('rows', lines);
-    this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 2 + 12) + 'px';
+    this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 4 + 12) + 'px';
 };
 BSEditbox.prototype.onKeyDown = function (e) {
     //BS.log(e.keyCode+" "+e.ctrlKey);
@@ -2120,13 +2041,18 @@ BSWindow.prototype.addLine = function (text) {
         script.setAttribute('src', '//s.imgur.com/min/embed.js');
         document.head.appendChild(script);
     }
-    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)/i)) {
+    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)(\?[^ ]+)?/i)) {
         embed = '<a href="' + matches[0] + '" target="_blank"><img src="' + matches[0] + '" /></a>';
     }
-    else if ((matches = text.match(/https?:\/\/(?:[^.]+)\.youtube\.com\/watch\?v=([^ ]+)/i)) || (matches = text.match(/https?:\/\/youtu\.be\/([^ ]+)/i))) {
-        embed = '<iframe width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + '" frameborder="0" allowfullscreen></iframe>';
+    else if ((matches = text.match(/https?:\/\/(?:[^.]+)\.youtube\.com\/watch\?v=([^ &]+)(?:&([^ ]+))?/i)) || (matches = text.match(/https?:\/\/youtu\.be\/([^ ?]+)(?:\?([^ ]+))?/i))) {
+        var parseTime = function (parameters) {
+            if (!parameters) return 0;
+            var matches = parameters.match(/t=(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/i);
+            return matches ? (matches[1] ? matches[1] * 3600 : 0) + (matches[2] ? matches[2] * 60 : 0) + (matches[3] ? Number(matches[3]) : 0) : 0;
+        };
+        embed = '<iframe width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + "?start=" + parseTime(matches[2]) + '" frameborder="0" allowfullscreen></iframe>';
     }
-    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:mp4)/i)) {
+    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:mp4)(\?[^ ]+)?/i)) {
         embed = '<video width="400" height="225" src="' + matches[0] + '" controls="controls" preload="metadata"></video>';
     }
 

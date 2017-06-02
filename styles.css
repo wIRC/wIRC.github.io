@@ -9,6 +9,7 @@ body {
     font-size: 15px;
     font-weight: normal;
     text-decoration: none;
+    overflow: hidden;
 }
 table {
   border-collapse: collapse;
@@ -60,7 +61,7 @@ u {
     overflow-y: auto;
     overflow-x: hidden;
     outline: 0;
-    width: 150px;
+    width: 180px;
 }
 #middle {
     border-left: 1px solid;
@@ -84,19 +85,19 @@ u {
 }
 #switchbar {
     vertical-align: top;
-    margin: 2px;
+    padding: 2px;
 }
 #switchbar input {
     margin-bottom: 2px;
     line-height: 1.5em;
-    width: 150px;
+    width: 180px;
 }
 #editboxes {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: stretch;
-    min-height: 50px;
+    min-height: 52px;
 }
 #editboxes textarea {
     padding: 8px;
@@ -106,6 +107,7 @@ u {
     font-size: 16px;
     outline: none;
     border-radius: 3px;
+    border-width: 2px;
 }
 
 .b { font-weight: bold; }
@@ -160,7 +162,7 @@ u {
     display: none;
     color: #fff;
     background-color: #545454;
-    margin: 15% auto; /* 15% from the top and centered */
+    margin: 5% auto 0 auto;
     padding: 20px;
     border: 1px solid #888;
     width: 80%; /* Could be more or less, depending on screen size */
