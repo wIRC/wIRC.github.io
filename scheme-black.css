@@ -5,7 +5,7 @@ body {
 a {
     color: #fff;
 }
-input, textarea, select {
+input, textarea, select, span.button {
     background-color: #262626;
     border-color: #4c4c4c;
     color: #ccc;
@@ -28,21 +28,21 @@ input, textarea, select {
 .nick {
     color: #808080;
 }
-input.selected {
+span.button.selected {
     background-color: #4c4c4c;
     color: #fff;
 }
-input.newLine {
+span.button.newLine {
     color: #0080ff;
 }
-input.newMsg {
+span.button.newMsg {
     color: #ff0000;
 }
-input.highlight {
+span.button.highlight {
     color: #009000;
 }
 ::-webkit-scrollbar-thumb {
-    background-color: #181818;
+    background-color: #1e2124;
 }
 ::-webkit-scrollbar-track-piece {
     background-color: #2e3136;

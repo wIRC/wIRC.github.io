@@ -14,7 +14,7 @@ body {
 table {
   border-collapse: collapse;
 }
-input, textarea, select {
+input, textarea, select, span.button {
     font-family: Verdana, Arial, Helvetica, Sans-serif;
     font-size: 1em;
     border: 1px solid;
@@ -37,7 +37,7 @@ u {
 #titleLine {
     display: flex;
     flex-direction: row;
-    min-height: 26px;
+    min-height: 38px;
 }
 #title {
     display: flex;
@@ -45,7 +45,7 @@ u {
     flex-grow: 1;
     font-weight: bold;
     justify-content: center;
-    text-align: center;
+    margin-left: 20px;
 }
 #body {
     border-top: 1px solid;
@@ -75,6 +75,7 @@ u {
     flex-grow: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    height: 0;
 }
 #scrollbox div {
     width: 100%;
@@ -87,10 +88,13 @@ u {
     vertical-align: top;
     padding: 2px;
 }
-#switchbar input {
+#switchbar span.button {
     margin-bottom: 2px;
     line-height: 1.5em;
     width: 180px;
+    display: block;
+    text-align: center;
+    cursor: pointer;
 }
 #editboxes {
     display: flex;
@@ -171,13 +175,17 @@ u {
     width: 95%;
     font-family: monospace;
 }
+#buttons {
+    width: 186px;
+}
 #buttons > span {
     padding: 0;
     width: 20px;
     height: 20px;
     display: block;
-    margin: 3px;
+    margin: 9px;
     opacity: 0.33;
+    cursor: pointer;
 }
 #buttons > span:hover {
     opacity: 1;
@@ -192,9 +200,12 @@ u {
 }
 
 #lag {
-    position: absolute;
-    top: 5px;
-    right: 2px;
+    justify-content: center;
+    vertical-align: middle;
+    display: flex;
+    flex-direction: column;
+    white-space: nowrap;
+    padding: 0 5px;
 }
 .embed {
     display: block;
@@ -208,12 +219,14 @@ u {
 
 
 ::-webkit-scrollbar {
-    width: 12px;
+    width: 14px;
 }
-::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb , ::-webkit-scrollbar-track-piece {
     background-clip: padding-box;
+    border: 3px solid transparent;
     border-radius: 7px;
 }
+
 
 hr {
     border: none;

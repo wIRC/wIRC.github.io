@@ -751,7 +751,7 @@ BSServer.prototype.onEvent = function (e) {
             var msg = '* Disconnected' + (e.text ? ': ' + e.text : '');
             this.alias('ECHO', 'Status', msg);
             for (var i in this.windows) if (/^#/.test(i)) BS.UI.echo(msg, this.getWindow(i));
-            this.win.button.element.value = 'Status';
+            this.win.button.element.innerHTML = 'Status';
             break;
         }
         case 'JOIN': {
@@ -1242,11 +1242,11 @@ BSServer.prototype.remQuery = function (nick) {
 };
 BSServer.prototype.setMe = function (me) {
     this.me = me;
-    this.win.button.element.value = this.network + ' ' + this.me;
+    this.win.button.element.innerHTML = this.network + ' ' + this.me;
 };
 BSServer.prototype.setNetwork = function (network) {
     this.network = network;
-    this.win.button.element.value = this.network + ' ' + this.me;
+    this.win.button.element.innerHTML = this.network + ' ' + this.me;
 };
 
 
@@ -1831,10 +1831,12 @@ function BSSwitchbar(server) {
     document.getElementById('switchbar').appendChild(this.element);
 }
 BSSwitchbar.prototype.addButton = function (label, win) {
-    var element = document.createElement("input");
-    element.setAttribute('type', 'button');
+    var element = document.createElement("span");
+    //element.setAttribute('type', 'button');
+    element.setAttribute('class', 'button');
     element.setAttribute('data-wid', String(win.wid));
-    element.setAttribute('value', label);
+    //element.setAttribute('value', label);
+    element.appendChild(document.createTextNode(label));
     element.addEventListener('click', function (e) {
         BSWindow.windows[e.target.getAttribute('data-wid')].toogle();
     });
@@ -1886,7 +1888,6 @@ BSSwitchbar.prototype.update = function () {
     }
     for (var i = 0; i < buttons.length; i++) {
         this.element.appendChild(this.buttons[buttons[i]].element);
-        this.element.appendChild(document.createElement('br'));
     }
 };
 BSSwitchbar.prototype.deselected = function (button) {
