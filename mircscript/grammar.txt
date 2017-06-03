@@ -77,9 +77,17 @@ Statement
   / VariableAssignment
   / VariableIncrement
   / VariableDecrement
+  / CommentStatement { return {type: 'Comment', value: text()}; }
+  / Comment { return {type: 'Comment', value: text()}; }
   / c:Command { return {type: 'Statement', tokens: text()}; }
 
 // any line
+CommentStatement
+  = _ ";" (![\n] .)*
+  
+Comment
+  = _ "/*" (!"*/" .)* "*/" _
+  
 Command
   = head:CommandToken tail:(CommandToken)* { return [head].concat(tail); }
 

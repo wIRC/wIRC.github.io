@@ -11,6 +11,7 @@
     var setsShowEmbeds = document.getElementById('setsShowEmbeds');
     var setsSchemeDark = document.getElementById("setsSchemeDark");
     var setsSchemeBlack = document.getElementById("setsSchemeBlack");
+    var userScriptInput = document.getElementById('userScript');
 
     var applyUserScript = function (userScript) {
         if (!userScript) return BS.eventHandlers[0] = null;
@@ -34,7 +35,7 @@
     };
     applyUserScript(BS.prefs.userScript);
     settingsButton.addEventListener("click", function() {
-        document.getElementById('userScript').value = BS.prefs.userScript;
+        userScriptInput.value = BS.prefs.userScript;
         setsFontSizeValue.innerHTML = setsFontSize.value = BS.prefs.fontSize;
         setsShowEmbeds.checked = BS.prefs.showEmbeds;
         if (BS.prefs.scheme == "dark") setsSchemeDark.checked = true;
@@ -44,7 +45,7 @@
         BS.UI.modal.show('settings');
     });
     var settingOkButtonCallback = function (close) {
-        var userScript = document.getElementById('userScript').value;
+        var userScript = userScriptInput.value;
         var error = applyUserScript(userScript);
         if (!error || confirm('Error on userscript:\n\n' + error.valueOf()+'\n\nSave anyway?')) {
             BS.prefs.userScript = userScript;
@@ -61,7 +62,7 @@
     document.getElementById('settingsCancelButton').addEventListener('click', function () {
         BS.UI.modal.hide('settings');
     });
-    document.getElementById('userScript').placeholder = `Use JavaScript syntax
+    userScriptInput.placeholder = `Use JavaScript syntax
     The code here will be called for every event.
         Available objects:
         * e: The Event (contains: e.type, e.nick, e.chan, etc)
@@ -106,6 +107,36 @@
 
     setsFontSize.addEventListener('input', function () {
         setsFontSizeValue.innerHTML = setsFontSize.value;
+    });
+
+    userScriptInput.addEventListener('keydown', function (e) {
+        var start = userScriptInput.selectionStart;
+        var end = userScriptInput.selectionEnd;
+        console.log(start, end, e);
+        if (start == end) {
+            if (e.keyCode == 13) {
+                var left = userScriptInput.value.slice(0, end);
+                var matches;
+                if (matches = left.match(/(?:^|\n)( *).*?({?) *$/)) {
+                    var indent = matches[1].length;
+                    if (matches[2] === '{') indent += 4;
+                    if (indent > 0) {
+                        userScriptInput.value = left + "\n" + " ".repeat(indent) + userScriptInput.value.slice(end);
+                        userScriptInput.selectionStart = userScriptInput.selectionEnd = end + indent + 1;
+                        e.preventDefault();
+                    }
+                }
+            }
+            else if (e.key === "}") {
+                var left = userScriptInput.value.slice(0, end);
+                var matches;
+                if (matches = left.match(/(?:^|\n)( *)    $/)) {
+                    userScriptInput.value = left.slice(0, end - 4) + "}" + userScriptInput.value.slice(end);
+                    userScriptInput.selectionStart = userScriptInput.selectionEnd = end - 3;
+                    e.preventDefault();
+                }
+            }
+        }
     });
 
 });

@@ -54,7 +54,6 @@ var BS = {
                 var token = tokens[i];
                 var matches;
                 if (matches = token.match(/^(.+?(?:\..+?)+)(?::(\+\d+))?$/)) {
-                    console.log(matches);
                     hostname = matches[1];
                     if (matches[2]) port = matches[2];
                 }
@@ -174,18 +173,6 @@ var BS = {
         BS.plogs.store();
     },
     log: console.log.bind(console, 'BS'),
-    /*prefs: {
-        data: null,
-        get: function (name) {
-
-        },
-        set: function (name, value) {
-
-        },
-        init: function () {
-            BS.prefs.data = BS.sets.get('sets');
-        }
-    },*/
     sets: {
         get: function (name) {
             try {
@@ -2041,6 +2028,9 @@ BSWindow.prototype.addLine = function (text) {
         var script = document.createElement('script');
         script.setAttribute('src', '//s.imgur.com/min/embed.js');
         document.head.appendChild(script);
+    }
+    else if (matches = text.match(/https?:\/\/imgur\.com\/([^ /]+)/i)) {
+        embed = '<a href="//i.imgur.com/' + matches[1] + '.jpg" target="_blank"><img src="//i.imgur.com/' + matches[1] + '.jpg" /></a>';
     }
     else if (matches = text.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)(\?[^ ]+)?/i)) {
         embed = '<a href="' + matches[0] + '" target="_blank"><img src="' + matches[0] + '" /></a>';
