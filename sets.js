@@ -9,6 +9,8 @@
     var setsFontSize = document.getElementById('setsFontSize');
     var setsFontSizeValue = document.getElementById('setsFontSizeValue');
     var setsShowEmbeds = document.getElementById('setsShowEmbeds');
+    var setsHighlightWindow = document.getElementById('setsHighlightWindow');
+    var setsHighlightWords = document.getElementById('setsHighlightWords');
     var setsSchemeDark = document.getElementById("setsSchemeDark");
     var setsSchemeBlack = document.getElementById("setsSchemeBlack");
     var userScriptInput = document.getElementById('userScript');
@@ -38,8 +40,9 @@
         userScriptInput.value = BS.prefs.userScript;
         setsFontSizeValue.innerHTML = setsFontSize.value = BS.prefs.fontSize;
         setsShowEmbeds.checked = BS.prefs.showEmbeds;
-        if (BS.prefs.scheme == "dark") setsSchemeDark.checked = true;
-        else setsSchemeBlack.checked = true;
+        if (BS.prefs.scheme == "dark") setsSchemeDark.checked = true; else setsSchemeBlack.checked = true;
+        if (BS.prefs.highlightWindow) setsHighlightWindow.checked = true;
+        setsHighlightWords.value = BS.prefs.highlightWords;
         var downloadBackup = document.getElementById('downloadBackup');
         downloadBackup.href = BS.sets.backup();
         BS.UI.modal.show('settings');
@@ -52,6 +55,8 @@
             BS.prefs.fontSize = setsFontSize.value;
             BS.prefs.showEmbeds = setsShowEmbeds.checked;
             BS.prefs.scheme = setsSchemeDark.checked ? "dark" : "black";
+            BS.prefs.highlightWords = setsHighlightWords.value;
+            BS.prefs.highlightWindow = setsHighlightWindow.checked;
             BS.UI.updateStyle();
             BS.sets.savePrefs();
             if (close) BS.UI.modal.hide('settings');
@@ -112,12 +117,11 @@
     userScriptInput.addEventListener('keydown', function (e) {
         var start = userScriptInput.selectionStart;
         var end = userScriptInput.selectionEnd;
-        console.log(start, end, e);
         if (start == end) {
             if (e.keyCode == 13) {
                 var left = userScriptInput.value.slice(0, end);
-                var matches;
-                if (matches = left.match(/(?:^|\n)( *).*?({?) *$/)) {
+                var matches = left.match(/(?:^|\n)( *).*?({?) *$/);
+                if (matches) {
                     var indent = matches[1].length;
                     if (matches[2] === '{') indent += 4;
                     if (indent > 0) {
@@ -127,16 +131,38 @@
                     }
                 }
             }
-            else if (e.key === "}") {
+            else if (e.key === "}" || e.keyCode == 8) {
                 var left = userScriptInput.value.slice(0, end);
-                var matches;
-                if (matches = left.match(/(?:^|\n)( *)    $/)) {
-                    userScriptInput.value = left.slice(0, end - 4) + "}" + userScriptInput.value.slice(end);
-                    userScriptInput.selectionStart = userScriptInput.selectionEnd = end - 3;
+                var matches = left.match(/(?:^|\n)( *)    $/);
+                if (matches) {
+                    var char = e.keyCode == 8 ? "" : "}";
+                    userScriptInput.value = left.slice(0, end - 4) + char + userScriptInput.value.slice(end);
+                    userScriptInput.selectionStart = userScriptInput.selectionEnd = end - 4 + char.length;
                     e.preventDefault();
                 }
             }
+            // tab
+            else if (e.keyCode == 9) {
+                userScriptInput.value = userScriptInput.value.slice(0, end) + "    " + userScriptInput.value.slice(end);
+                userScriptInput.selectionStart = userScriptInput.selectionEnd = end + 4;
+                e.preventDefault();
+            }
         }
-    });
+    }, true);
+
+    var currentTab = "setsTabAppearance";
+    var currentButton = document.querySelector("#setsMenu button");
+    document.getElementById(currentTab).style.display = 'initial';
+    document.getElementById("setsMenu").addEventListener("click", function (e) {
+        var tab = e.target.getAttribute('data-tab');
+        if (tab) {
+            if (currentButton) currentButton.className = '';
+            document.getElementById(currentTab).style.display = 'none';
+            document.getElementById(tab).style.display = 'initial';
+            e.target.className = 'selected';
+            currentTab = tab;
+            currentButton = e.target;
+        }
+    })
 
 });

@@ -80,6 +80,7 @@ u {
 #scrollbox div {
     width: 100%;
     overflow-wrap: break-word;
+    word-break: break-word;
 }
 #scrollbox p {
     margin: 3px 0 3px 0;
@@ -173,7 +174,9 @@ u {
 }
 #userScript {
     width: 95%;
+    height: 95%;
     font-family: monospace;
+    white-space: nowrap;
 }
 #buttons {
     width: 186px;
@@ -227,9 +230,35 @@ u {
     border-radius: 7px;
 }
 
-
 hr {
     border: none;
     margin: 8px 10px 8px 10px;
     height: 1px;
+}
+
+#setsTabs > div {
+    display: none;
+}
+
+#modal-settings {
+    height: 75%;
+}
+#settings-window {
+    height: 95%;
+    display: flex;
+}
+#setsMenu {
+    display: flex;
+    flex-direction: column;
+    width: 125px;
+    margin: 10px 10px 0 0;
+}
+#setsMenu button {
+    margin-bottom: 5px;
+}
+#setsMenu button.selected {
+    font-weight: bold;
+}
+#setsTabs {
+    flex: 1;
 }

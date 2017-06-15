@@ -41,25 +41,44 @@
         </span>
         <div id="modal" class="modal">
             <div id="modal-settings" class="modal-content">
-                <p>Font size: <input type="range" min="5" max="36" id="setsFontSize" /><span id="setsFontSizeValue"></span> px</p>
-                <p><label><input type="checkbox" id="setsShowEmbeds" /> Show images and videos</label></p>
-                <p>
-                    <form>
-                        Theme:
-                        <label><input type="radio" name="scheme" id="setsSchemeDark"> Dark</label>
-                        <label><input type="radio" name="scheme" id="setsSchemeBlack"> Black</label>
-                    </form>
-                </p>
-                <p>Custom script:</p>
-                <textarea rows="12" id="userScript"></textarea><br />
-                <p>
-                    <a id="downloadBackup" target="_blank" download="wIRC-backup.json">Download settings backup.</a>
-                    <a onclick="document.getElementById('restoreBackup').click();" href="javascript:">Restore settings from file.</a>
-                    <input type="file" id="restoreBackup" style="display: none;" />
-                </p>
-                <p>
-                    <a id="downloadLogs" href="javascript:">Download logs.</a>
-                </p>
+                <div id="settings-window">
+                    <div id="setsMenu">
+                        <button data-tab="setsTabAppearance" class="selected">Appearance</button>
+                        <button data-tab="setsTabIRC">IRC</button>
+                        <button data-tab="setsTabScript">Scripting</button>
+                        <button data-tab="setsTabAdvanced">Advanced</button>
+                    </div>
+                    <div id="setsTabs">
+                        <div id="setsTabAppearance">
+                            <p>Font size: <input type="range" min="5" max="36" id="setsFontSize" /><span id="setsFontSizeValue"></span> px</p>
+                            <p><label><input type="checkbox" id="setsShowEmbeds" /> Show images and videos</label></p>
+                            <p>
+                            <form>
+                                Theme:
+                                <label><input type="radio" name="scheme" id="setsSchemeDark"> Dark</label>
+                                <label><input type="radio" name="scheme" id="setsSchemeBlack"> Black</label>
+                            </form>
+                            </p>
+                        </div>
+                        <div id="setsTabIRC">
+                            <p><label><input type="checkbox" id="setsHighlightWindow"> Enable highlight window.</label></p>
+                            <p><label>Highlight words: <input type="text" id="setsHighlightWords"></label></p>
+                        </div>
+                        <div id="setsTabScript">
+                            <textarea rows="12" id="userScript"></textarea><br />
+                        </div>
+                        <div id="setsTabAdvanced">
+                            <p>
+                                <a id="downloadBackup" target="_blank" download="wIRC-backup.json">Download settings backup.</a>
+                                <a onclick="document.getElementById('restoreBackup').click();" href="javascript:">Restore settings from file.</a>
+                                <input type="file" id="restoreBackup" style="display: none;" />
+                            </p>
+                            <p>
+                                <a id="downloadLogs" href="javascript:">Download logs.</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
                 <button id="settingsOkButton">OK</button>
                 <button id="settingsApplyButton">Apply</button>
                 <button id="settingsCancelButton">Cancel</button>

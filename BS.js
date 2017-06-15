@@ -237,7 +237,9 @@ var BS = {
                 userScript: '',
                 fontSize: 15,
                 showEmbeds: true,
-                scheme: "dark"
+                scheme: "dark",
+                highlightWords: "",
+                highlightWindow: false
             };
             BS.prefs = BS.sets.get("sets") || {};
             for (var i in defaultPrefs) if (!(i in BS.prefs)) BS.prefs[i] = defaultPrefs[i];
@@ -404,7 +406,9 @@ var BS = {
         },
         highlight: {
             search: function (server, text, nick, chan) {
-                var reg = new RegExp('\\b(' + escapeRegExp(server.ident.me()) + ')(?![a-z0-9_\\-\\[\\]\\\\^{}|`])','i');
+                var words = BS.prefs.highlightWords.split(" ");
+                words.push(server.ident.me());
+                var reg = new RegExp('\\b(' + words.map(escapeRegExp).join('|') + ')(?![a-z0-9_\\-\\[\\]\\\\^{}|`])','i');
                 if (text.match(reg)) {
                     //text = '<u class="hl">'+text+'</u>';
                     BS.UI.highlight.perform(server, text, nick, chan);
@@ -416,11 +420,11 @@ var BS = {
                 //change switchbar colour
                 server.switchbar.highlight(chan || nick);
 
-
                 //echo in highlight window
-                if (!server.getWindow('@highlight')) server.alias('WINDOW @highlight');
-                server.alias('ECHO', '@highlight', BS.theme.highlight(chan, nick, text));
-
+                if (BS.prefs.highlighWindow) {
+                    if (!server.getWindow('@highlight')) server.alias('WINDOW @highlight');
+                    server.alias('ECHO', '@highlight', BS.theme.highlight(chan, nick, text));
+                }
 
                 if (document.visibilityState != 'visible') {
                     //beep
@@ -1682,25 +1686,30 @@ BSEditbox.prototype.focus = function () { this.obj.focus(); };
 BSEditbox.prototype.getText = function () { return this.obj.value; };
 BSEditbox.prototype.onInput = function (e) {
     this.win.server.lastInputTime = Date.now();
-    var lines = this.getText().replace(/\r/, "").split("\n");
-    for (var i = 0; i < lines.length; i++) {
-        var text = lines[i];
-        if (!text) continue;
-        this.history.push(text);
-        if (this.history.length == 32) this.history.shift();
-        this.historyIndex = 0;
-        var regs;
-        if (e.ctrlKey) this.win.server.alias('SAY', text);
-        else if (regs = text.match(/^\/\/(.+)$/)) {
-            this.win.server.eval(regs[1]);
+    var splitLongLines = function (str) {
+        return str.replace(/^(.{400})(.+)/gm, function (match, p1, p2) { return p1 + "\n" + splitLongLines(p2); });
+    };
+    var lines = splitLongLines(this.getText().replace(/\r/, "").replace(/\n\n+/, "\n")).split("\n");
+    if (lines.length < 6 || confirm("Do you really want to send " + lines.length + " lines at once?")) {
+        for (var i = 0; i < lines.length; i++) {
+            var text = lines[i];
+            if (!text) continue;
+            this.history.push(text);
+            if (this.history.length == 32) this.history.shift();
+            this.historyIndex = 0;
+            var regs;
+            if (e.ctrlKey) this.win.server.alias('SAY', text);
+            else if (regs = text.match(/^\/\/(.+)$/)) {
+                this.win.server.eval(regs[1]);
+            }
+            else if (regs = text.match(/^\/(.+)$/)) {
+                this.win.server.call(regs[1]);
+            }
+            else this.win.server.alias('SAY', text);
         }
-        else if (regs = text.match(/^\/(.+)$/)) {
-            this.win.server.call(regs[1]);
-        }
-        else this.win.server.alias('SAY', text);
+        this.setText("");
+        this.obj.name = "editbox_" + Math.random();
     }
-    this.setText("");
-    this.obj.name = "editbox_"+Math.random();
     return false;
 };
 BSEditbox.prototype.onChange = function (e) {
