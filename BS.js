@@ -407,7 +407,7 @@ var BS = {
         },
         highlight: {
             search: function (server, text, nick, chan) {
-                var words = BS.prefs.highlightWords.split(" ");
+                var words = BS.prefs.highlightWords ? BS.prefs.highlightWords.split(" ") : [];
                 words.push(server.ident.me());
                 var reg = new RegExp('\\b(' + words.map(escapeRegExp).join('|') + ')(?![a-z0-9_\\-\\[\\]\\\\^{}|`])','i');
                 if (text.match(reg)) {
