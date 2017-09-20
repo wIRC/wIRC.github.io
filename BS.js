@@ -2064,7 +2064,7 @@ BSWindow.prototype.addLine = function (text) {
 
     // add embed
     if (embed) {
-        let nsfw = /nsfw|sex|xxx/.test(text);
+        let nsfw = /nsfw|sex|xxx/i.test(text);
         text += '<u class="embed'+(nsfw ? " nsfw" : "")+'">' + embed + '</u>';
     }
 
