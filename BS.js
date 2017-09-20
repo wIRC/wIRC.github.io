@@ -29,8 +29,8 @@ var BS = {
                         password: serverState.password
                     }
                 );
-                for (var j = 0; j < serverState.chans.length; j++) server.addChan(serverState.chans[j]);
-                for (var j = 0; j < serverState.queries.length; j++) server.addQuery(serverState.queries[j]);
+                if (serverState.chans) for (var j = 0; j < serverState.chans.length; j++) server.addChan(serverState.chans[j]);
+                if (serverState.queries) for (var j = 0; j < serverState.queries.length; j++) server.addQuery(serverState.queries[j]);
                 if (serverState.active) active = server.getWindow(serverState.active);
             }
         }
@@ -221,8 +221,8 @@ var BS = {
                 serverState.nick = server.nick;
                 serverState.chans = [];
                 for (var i in server.chans) serverState.chans.push(server.chans[i].name);
-                //serverState.chans = BS.util.getObjectKeys(server.chans);
-                serverState.queries = BS.util.getObjectKeys(server.queries);
+                serverState.queries = [];
+                for (var i in server.queries) serverState.queries.push(server.queries[i].nick);
                 serverState.hostname = server.hostname;
                 serverState.port = server.port;
                 serverState.login = server.login;
@@ -237,6 +237,7 @@ var BS = {
                 userScript: '',
                 fontSize: 15,
                 showEmbeds: true,
+                hideNSFW: true,
                 scheme: "dark",
                 highlightWords: "",
                 highlightWindow: false
@@ -500,6 +501,7 @@ var BS = {
             var styleObj = document.getElementById('style');
             styleObj.innerHTML = 'body { font-size: ' + BS.prefs.fontSize + 'px; }\n';
             if (!BS.prefs.showEmbeds) styleObj.innerHTML += '.embed { display: none; }\n';
+            if (BS.prefs.hideNSFW) styleObj.innerHTML += '.nsfw { display: none; }\n';
             document.getElementById("scheme").setAttribute("href", BS.prefs.scheme == "dark" ? "scheme-dark.css" : "scheme-black.css");
         },
         updateTitle: function () {
@@ -573,7 +575,8 @@ var BS = {
                 //a.appendChild(document.createTextNode(match));
                 //return a.outerHTML;
             });
-            str = str.replace(/(1[0-5]|0?\d)(?:,(1[0-5]|0?\d))?([^]+)(?:(?=|)|$)/g, function (match, c, bc, text) {
+            BS.log('ircformat:', str);
+            str = str.replace(/(1[0-5]|0?\d)(?:,(1[0-5]|0?\d))?([^]*)(?:(?=|)|$)/g, function (match, c, bc, text) {
                 return '<u class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</u>';
             });
             str = str.replace(/|/g, '');
@@ -700,7 +703,7 @@ BSServer.prototype.onEvent = function (e) {
     for (var i = 0; i < BS.eventHandlers.length; i++) {
         if (BS.eventHandlers[i]) {
             try { BS.eventHandlers[i].call(this, e); }
-            catch (e) { BS.log('Error on eventHandler[' + i + ']:', e); }
+            catch (error) { BS.log('Error:', error, 'on eventHandler[' + i + ']:', BS.eventHandlers[i], "for event:", e); }
         }
     }
     BS.log('event:', e.type, e);
@@ -2060,7 +2063,10 @@ BSWindow.prototype.addLine = function (text) {
     text = BS.util.ircformat(BS.util.htmlEntities(text));
 
     // add embed
-    if (embed) text += '<u class="embed">' + embed + '</u>';
+    if (embed) {
+        let nsfw = /nsfw|sex|xxx/.test(text);
+        text += '<u class="embed'+(nsfw ? " nsfw" : "")+'">' + embed + '</u>';
+    }
 
     // add to DOM
     var line = document.createElement("p");
@@ -2167,7 +2173,7 @@ function BSPLogger() {
     this.logs = {};
 }
 BSPLogger.prototype.add = function (network, label, text) {
-    var id = network + '_' + label;
+    var id = network + '_' + label.toLowerCase();
     if (!this.logs[id]) this.logs[id] = ['New log session: ' + new Date().toISOString().slice(0, -5).replace(/T/, ' '), text];
     else this.logs[id].push(text);
 };
@@ -2188,7 +2194,7 @@ BSPLogger.prototype.store = function () {
 };
 BSPLogger.prototype.backup = function (network, label, format) {
     if (network && label) {
-        var i = 'plogs_' + network + '_' + label;
+        var i = 'plogs_' + network + '_' + label.toLowerCase();
         var log = localStorage.getItem(i) || '';
         if (format == 'strip') log = log.replace(/(1[0-5]|0?[0-9](,(1[0-5]|0?[0-9]))?)?|[]/g, '');
         localStorage.removeItem(i);
@@ -2238,18 +2244,18 @@ BSLogger.prototype.clean = function () {
     this.store();
 };
 BSLogger.prototype.get = function (network, label) {
-    BS.log('Loading window log:', network, label);
-    return BS.sets.get('logs_' + network + '_' + label) || '';
+    BS.log('Loading window log:', network, label.toLowerCase());
+    return BS.sets.get('logs_' + network + '_' + label.toLowerCase()) || '';
 };
 BSLogger.prototype.save = function (network, label, innerHTML) {
-    BS.log('Saving window log:', network, label);
-    BS.sets.set('logs_' + network + '_' + label, innerHTML);
-    this.logs[network + '_' + label] = BS.util.time();
+    BS.log('Saving window log:', network, label.toLowerCase());
+    BS.sets.set('logs_' + network + '_' + label.toLowerCase(), innerHTML);
+    this.logs[network + '_' + label.toLowerCase()] = BS.util.time();
 };
 BSLogger.prototype.saveAll = function () {
     for (var wid in BSWindow.windows) {
         var win = BSWindow.windows[wid];
-        this.save(win.server.network, win.label, win.msgBox.innerHTML);
+        this.save(win.server.network, win.label.toLowerCase(), win.msgBox.innerHTML);
     }
 };
 BSLogger.prototype.store = function () {
