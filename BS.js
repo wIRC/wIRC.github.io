@@ -1741,11 +1741,25 @@ BSEditbox.prototype.onKeyDown = function (e) {
         //tab
         case 9: {
             e.preventDefault();
+
             // eval idents
             var server = this.win.server;
-            this.setText(this.getText().replace(/\$[^ ]+(?:\(.+\))?$/, function (match, offset, string) {
-                return server.evalCommand(string);
-            }));
+            let leftText = this.obj.value.substr(0, this.obj.selectionEnd);
+            if (leftText.match(/\$[^ ]|#$/)) {
+                let rightText = this.obj.value.substr(this.obj.selectionEnd);
+                if (leftText.match(/#$/) && BS.util.isChanName(BSWindow.active.label)) {
+                    leftText = leftText.replace(/#$/, BSWindow.active.label);
+                }
+                else {
+                    leftText = leftText.replace(/\$[^ ]+$/, function (match) {
+                        return server.evalCommand(match);
+                    });
+                }
+                this.setText(leftText + rightText);
+                this.obj.selectionStart = this.obj.selectionEnd = leftText.length;
+            }
+
+            // user auto-complete
             if (!this.tabText) {
                 this.tabIndex = 0;
                 this.tabText = new RegExp('^' + this.getText().match(/[^ ]*$/), 'i');
@@ -2081,7 +2095,7 @@ BSWindow.prototype.addLine = function (text) {
 
     // add embed
     if (embed) {
-        let nsfw = /nsfw|sex|xxx/i.test(text);
+        let nsfw = /nsfw|sex|xxx|porn/i.test(text);
         text += '<u class="embed'+(nsfw ? " nsfw" : "")+'">' + embed + '</u>';
     }
 
