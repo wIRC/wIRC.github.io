@@ -69,7 +69,7 @@ u {
     flex-direction: column;
     flex-grow: 1;
 }
-#scrollbox {
+#scrollBox {
     margin-left: 1px;
     padding: 1px 0 0 5px;
     flex-grow: 1;
@@ -77,12 +77,12 @@ u {
     -webkit-overflow-scrolling: touch;
     height: 0;
 }
-#scrollbox div {
+#scrollBox div {
     width: 100%;
     overflow-wrap: break-word;
     word-break: break-word;
 }
-#scrollbox p {
+#scrollBox p {
     margin: 3px 0 3px 0;
 }
 #switchbar {
@@ -216,7 +216,7 @@ u {
 }
 .embed img {
     border-radius: 2px;
-    max-width: 520px;
+    max-width: 50%;
     max-height: 225px;
 }
 

@@ -8,6 +8,7 @@
     var closeButton = document.getElementsByClassName("closeButton")[0];
     var setsFontSize = document.getElementById('setsFontSize');
     var setsFontSizeValue = document.getElementById('setsFontSizeValue');
+    var setsBufferLimit = document.getElementById('setsBufferLimit');
     var setsShowEmbeds = document.getElementById('setsShowEmbeds');
     var setsHideNSFW = document.getElementById('setsHideNSFW');
     var setsHighlightWindow = document.getElementById('setsHighlightWindow');
@@ -40,6 +41,7 @@
     settingsButton.addEventListener("click", function() {
         userScriptInput.value = BS.prefs.userScript;
         setsFontSizeValue.innerHTML = setsFontSize.value = BS.prefs.fontSize;
+        setsBufferLimit.value = BS.prefs.bufferLimit;
         setsShowEmbeds.checked = BS.prefs.showEmbeds;
         setsHideNSFW.checked = BS.prefs.hideNSFW;
         if (BS.prefs.scheme == "dark") setsSchemeDark.checked = true; else setsSchemeBlack.checked = true;
@@ -55,6 +57,7 @@
         if (!error || confirm('Error on userscript:\n\n' + error.valueOf()+'\n\nSave anyway?')) {
             BS.prefs.userScript = userScript;
             BS.prefs.fontSize = setsFontSize.value;
+            BS.prefs.bufferLimit = setsBufferLimit.value;
             BS.prefs.showEmbeds = setsShowEmbeds.checked;
             BS.prefs.hideNSFW = setsHideNSFW.checked;
             BS.prefs.scheme = setsSchemeDark.checked ? "dark" : "black";

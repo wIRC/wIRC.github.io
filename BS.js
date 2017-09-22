@@ -96,12 +96,12 @@ var BS = {
         setTimeout(function (){ BS.logs.clean(); }, 30000);
 
         //automatically copy selected text and focus editbox
-        document.getElementById('scrollbox').addEventListener("click", function () {
+        document.getElementById('scrollBox').addEventListener("click", function () {
             document.execCommand('copy');
             BSWindow.active.editbox.focus();
         });
 
-        document.getElementById('scrollbox').addEventListener("dblclick", function () {
+        document.getElementById('scrollBox').addEventListener("dblclick", function () {
             var active = BSWindow.active;
             if (BS.util.isChanName(active.label)) {
                 active.server.alias('MODE ' + active.label);
@@ -172,7 +172,7 @@ var BS = {
         BS.sets.saveState();
         BS.plogs.store();
     },
-    log: console.log.bind(console, 'BS'),
+    log: localStorage.getItem("debug", false) ? console.log.bind(console, 'BS') : function () {},
     sets: {
         get: function (name) {
             try {
@@ -236,6 +236,7 @@ var BS = {
             var defaultPrefs = {
                 userScript: '',
                 fontSize: 15,
+                bufferLimit: 1050,
                 showEmbeds: true,
                 hideNSFW: true,
                 scheme: "dark",
@@ -315,10 +316,10 @@ var BS = {
             return '15o 15Now talking on07 ' + chan + '';
         },
         kick: function (nick, knick, chan, text) {
-            return '15o Kick: 07' + knick + ' 15 was kicked by 07' + nick + '15 from 07' + chan + ' (' + text + '07)';
+            return '15o Kick: 07' + knick + ' 15 was kicked by 07' + nick + '15 from 07' + chan + (text ? ' (' + text + '07)' : '');
         },
         part: function (nick, chan, text) {
-            return '15o Part: 07' + nick + ' 15has left 07' + chan + ' (15' + text + '07)';
+            return '15o Part: 07' + nick + ' 15has left 07' + chan + (text ? ' (15' + text + '07)' : '');
         },
         quit: function (nick, text) {
             return '15o Quit: 07' + nick + ' 15has left IRC: ' + text;
@@ -1520,7 +1521,7 @@ BSIdent.prototype.nick = function () { //todo: implement
 BSIdent.prototype.nicks = function (chan) { return BS.chans[chan].nicks.join(','); };
 BSIdent.prototype.notify = function () { return ''; };
 BSIdent.prototype['null'] = function () { return ''; };
-BSIdent.prototype.prefix = function () { console.log(this); return this.server.prefix.prefix; };
+BSIdent.prototype.prefix = function () { return this.server.prefix.prefix; };
 BSIdent.prototype.prefixModes = function () { return this.server.prefix.modes; };
 BSIdent.prototype.prefixChars = function () { return this.server.prefix.chars; };
 BSIdent.prototype.server = function () { return this.server.hostname; };
@@ -1697,8 +1698,11 @@ BSEditbox.prototype.onInput = function (e) {
         for (var i = 0; i < lines.length; i++) {
             var text = lines[i];
             if (!text) continue;
-            this.history.push(text);
-            if (this.history.length == 32) this.history.shift();
+            if (this.historyIndex) this.history.pop(); // remove the text that was in the editbox when the user pressed up
+            if (this.historyIndex != 2 || text != this.history[this.history.length - 1]) { // add to history if the user didn't repeat the last line from the history
+                this.history.push(text);
+                if (this.history.length == 32) this.history.shift();
+            }
             this.historyIndex = 0;
             var regs;
             if (e.ctrlKey) this.win.server.alias('SAY', text);
@@ -1717,8 +1721,10 @@ BSEditbox.prototype.onInput = function (e) {
 };
 BSEditbox.prototype.onChange = function (e) {
     var lines = (this.obj.value.match(/\n/g) || []).length + 1;
+    this.win.saveScrollState();
     this.obj.setAttribute('rows', lines);
     this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 4 + 12) + 'px';
+    this.win.restoreScrollState();
 };
 BSEditbox.prototype.onKeyDown = function (e) {
     //BS.log(e.keyCode+" "+e.ctrlKey);
@@ -1774,10 +1780,19 @@ BSEditbox.prototype.onKeyDown = function (e) {
         //up key
         case 38: {
             if (!/\n/.test(this.obj.value.slice(0, this.obj.selectionEnd))) {
-                if (!this.history.length) break;
-                this.historyIndex++;
-                if (this.historyIndex > this.history.length) this.historyIndex = 1;
-                this.setText(this.history[this.history.length - this.historyIndex]);
+                if (this.history.length && this.historyIndex < this.history.length) {
+                    if (this.historyIndex == 0) { // enter history mode adding the current text
+                        this.history.push(this.getText());
+                        this.historyIndex = 2;
+                    }
+                    else {
+                        if (this.historyIndex == 1) { // save current text when already in history mode
+                            this.history[this.history.length - 1] = this.getText();
+                        }
+                        this.historyIndex++;
+                    }
+                    this.setText(this.history[this.history.length - this.historyIndex]);
+                }
                 e.preventDefault();
             }
             break;
@@ -1785,10 +1800,10 @@ BSEditbox.prototype.onKeyDown = function (e) {
         //down key
         case 40: {
             if (!/\n/.test(this.obj.value.slice(this.obj.selectionEnd))) {
-                if (!this.history.length) break;
-                this.historyIndex--;
-                if (this.historyIndex < 1) this.historyIndex = this.history.length;
-                this.setText(this.history[this.history.length - this.historyIndex]);
+                if (this.history.length && this.historyIndex > 1) {
+                    this.historyIndex--;
+                    this.setText(this.history[this.history.length - this.historyIndex]);
+                }
                 e.preventDefault();
             }
             break;
@@ -1977,8 +1992,8 @@ BSNicklist.prototype.selected = function () {
 };
 
 function BSWindow(label, server) {
-    this.bufferLimit = 1050;//600;
-    this.bufferRestore = 1000;//500;
+    this.bufferLimit = BS.prefs.bufferLimit;
+    this.bufferRestore = Math.max(0, BS.prefs.bufferLimit - 50);
     server.windows[label.toLowerCase()] = this;
     this.label = label;
     this.server = server;
@@ -1987,7 +2002,7 @@ function BSWindow(label, server) {
     //create msgBox
     this.msgBox = document.createElement("div");
     this.msgBox.setAttribute('id', 'msgBox_' + label);
-    document.getElementById('scrollbox').appendChild(this.msgBox);
+    document.getElementById('scrollBox').appendChild(this.msgBox);
     this.msgBox.innerHTML = BS.logs.get(server.network, label).replace(/<tr><td class="line">/g, '<p>').replace(/<\/td><\/tr>/g, '</p>');
 
     this.button = server.switchbar.addButton(label, this);
@@ -1995,6 +2010,8 @@ function BSWindow(label, server) {
     this.nicklist = /^#/.test(label) && new BSNicklist(label, this);
     this.editbox = new BSEditbox(label, this);
     this.separator = false;
+    this.scroll = 100000;
+    this.restoreScrollState();
 
     // last thing
     this.select();
@@ -2042,10 +2059,10 @@ BSWindow.prototype.addLine = function (text) {
         document.head.appendChild(script);
     }
     else if (matches = text.match(/https?:\/\/imgur\.com\/([^ /]+)/i)) {
-        embed = '<a href="//i.imgur.com/' + matches[1] + '.jpg" target="_blank"><img src="//i.imgur.com/' + matches[1] + '.jpg" /></a>';
+        embed = '<a href="//i.imgur.com/' + matches[1] + '.jpg" target="_blank"><img onload="restoreScroll()" src="//i.imgur.com/' + matches[1] + '.jpg" /></a>';
     }
     else if (matches = text.match(/https?:\/\/[^ ]+\.(?:jpe?g|png|gif)(\?[^ ]+)?/i)) {
-        embed = '<a href="' + matches[0] + '" target="_blank"><img src="' + matches[0] + '" /></a>';
+        embed = '<a href="' + matches[0] + '" target="_blank"><img onload="restoreScroll()" src="' + matches[0] + '" /></a>';
     }
     else if ((matches = text.match(/https?:\/\/(?:[^.]+)\.youtube\.com\/watch\?v=([^ &]+)(?:&([^ ]+))?/i)) || (matches = text.match(/https?:\/\/youtu\.be\/([^ ?]+)(?:\?([^ ]+))?/i))) {
         var parseTime = function (parameters) {
@@ -2053,10 +2070,10 @@ BSWindow.prototype.addLine = function (text) {
             var matches = parameters.match(/t=(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/i);
             return matches ? (matches[1] ? matches[1] * 3600 : 0) + (matches[2] ? matches[2] * 60 : 0) + (matches[3] ? Number(matches[3]) : 0) : 0;
         };
-        embed = '<iframe width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + "?start=" + parseTime(matches[2]) + '" frameborder="0" allowfullscreen></iframe>';
+        embed = '<iframe onload="restoreScroll()" width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + "?start=" + parseTime(matches[2]) + '" frameborder="0" allowfullscreen></iframe>';
     }
     else if (matches = text.match(/https?:\/\/[^ ]+\.(?:mp4)(\?[^ ]+)?/i)) {
-        embed = '<video width="400" height="225" src="' + matches[0] + '" controls="controls" preload="metadata"></video>';
+        embed = '<video onload="restoreScroll()" width="400" height="225" src="' + matches[0] + '" controls="controls" preload="metadata"></video>';
     }
 
     // format text (to HTML)
@@ -2101,14 +2118,19 @@ BSWindow.prototype.addLine = function (text) {
     }
     */
 
-    //detect if scrollbox is totally scrolled
-    var scrollbox = document.getElementById("scrollbox");
-    var scrollTop = scrollbox.scrollTop;
-    scrollbox.scrollTop += 1;
-    var scrolled = scrollTop == scrollbox.scrollTop;
+    //detect if scrollBox is totally scrolled
+    this.saveScrollState();
     this.msgBox.appendChild(line); //append line
-    scrollbox.scrollTop = scrolled ? 100000 : scrollTop; //restore scroll or scroll to bottom
-
+    this.restoreScrollState();
+};
+BSWindow.prototype.saveScrollState = function () {
+    var scrollBox = document.getElementById("scrollBox");
+    var scrollTop = scrollBox.scrollTop;
+    scrollBox.scrollTop += 1;
+    this.scroll = scrollTop == scrollBox.scrollTop ? scrollTop + 100000 : scrollTop;
+}
+BSWindow.prototype.restoreScrollState = function () {
+    document.getElementById("scrollBox").scrollTop = this.scroll;
 };
 BSWindow.prototype.addSeparator = function () {
     // only add separator if window is not empty
@@ -2161,7 +2183,7 @@ BSWindow.prototype.select = function () {
     this.server.switchbar.selected(this.button);
     if (this.nicklist) this.nicklist.selected();
     this.editbox.show();
-    document.getElementById("scrollbox").scrollTop = 100000;
+    document.getElementById("scrollBox").scrollTop = 100000;
     BS.UI.updateTitle();
 };
 BSWindow.prototype.toogle = function () {
@@ -2301,3 +2323,8 @@ function escapeRegExp(str) {
 }
 
 document.addEventListener("DOMContentLoaded", BS.onLoad);
+
+window["restoreScroll"] = function () {
+    // BS.log("Embed loaded. Restoring scroll.");
+    BSWindow.active.restoreScrollState();
+};

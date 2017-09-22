@@ -118,7 +118,7 @@ var MB = {
                 case 'CHANNELLIST': return server.event('RAW', {command: '322', prefix: '', params: server.ident.me() + ' ' + data.name +' ' + data.users, trailing: data.topic});
                 case 'CHANNELLISTEND': return server.event('RAW', {command: '323', prefix: '', params: '', trailing: ''});
                 case 'UNBAN': return server.event('RAW', {command: 'MODE', prefix: data.by, params: channel[2] + ' -b ' + data.nick});
-                case 'MODE': return server.event('RAW', {command: 'MODE', prefix: data.by, params: data.localchannel + ' ' + data.msg.slice(-2)});
+                case 'MODE': return server.event('RAW', {command: 'MODE', prefix: data.by || data.nick, params: data.localchannel + ' ' + data.msg.slice(-2)});
                 case 'TOPIC': {
                     if (data.nick) return server.event('RAW', {command: 'TOPIC', prefix: data.nick, params: data.localchannel, trailing: data.topic});
                     return server.event('RAW', {command: '332', params: server.ident.me() + ' ' + data.localchannel, trailing: data.topic});
@@ -298,7 +298,7 @@ var MB = {
         return MB.sendData(data);
     },
     sendData: function (data) {
-        console.log('->', data);
+        BS.log('->', data);
         if (MB.socket && MB.socket.readyState == MB.socket.OPEN) {
             MB.socket.send(JSON.stringify(data));
             return true;

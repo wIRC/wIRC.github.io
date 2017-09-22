@@ -426,7 +426,7 @@ $(function(){
 
 
     $.contextMenu({
-        selector: '#scrollbox',
+        selector: '#scrollBox',
         className: 'contextmenu-custom',
         build: function($trigger, e) {
             var vars = {text: BSWindow.active.server.ident.active(), chan: BSWindow.active.server.ident.active()};
