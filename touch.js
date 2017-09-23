@@ -1,26 +1,48 @@
 // touch events
+var switchbar;
+var nicklist;
 
 document.addEventListener('touchstart', handleTouchStart, false);
 document.addEventListener('touchmove', handleTouchMove, false);
 document.addEventListener("DOMContentLoaded", function () {
-    var switchbar = document.getElementById('switchbar');
-    var nicklist = document.getElementById('nicklist');
-    if (screen.width < 500) {
+    switchbar = document.getElementById('switchbar');
+    nicklist = document.getElementById('nicklist');
+    updateScreenSize();
+
+    switchbar.addEventListener('mouseleave', function (e) {
+        if (innerWidth < 500) {
+            switchbar.style.display = 'none';
+        }
+    });
+    nicklist.addEventListener('mouseleave', function (e) {
+        if (innerWidth < 500) {
+            nicklist.style.display = 'none';
+        }
+    });
+
+});
+addEventListener("resize", updateScreenSize);
+
+function updateScreenSize() {
+    if (innerWidth < 500) {
         switchbar.style.display = 'none';
         nicklist.style.display = 'none';
     }
-});
+    else {
+        switchbar.style.display = '';
+        nicklist.style.display = '';
+    }
+}
+
 
 var xDown = null;
 var yDown = null;
-var leftState = false;
-var rightState = false;
 
 
 function handleTouchStart(evt) {
     xDown = evt.touches[0].clientX;
     yDown = evt.touches[0].clientY;
-};
+}
 
 function handleTouchMove(evt) {
     if (!xDown || !yDown) {
@@ -34,24 +56,22 @@ function handleTouchMove(evt) {
     var yDiff = yDown - yUp;
 
     if (Math.abs(xDiff) > Math.abs(yDiff)) {/*most significant*/
-        var switchbar = document.getElementById('switchbar');
-        var nicklist = document.getElementById('nicklist');
         // left
         if (xDiff > 0) {
-            BS.log('left', xDiff, yDiff, xDown / $(document).width());
-            if (xDown / $(document).width() > .85) {
+            BS.log('left', xDiff, yDiff, xDown / innerWidth);
+            if (xDown / innerWidth > .85) {
                 nicklist.style.display = '';
             }
-            else if (xDown / $(document).width() < .40) {
+            else if (xDown / innerWidth < .40) {
                 switchbar.style.display = 'none';
             }
             // right
         } else {
-            BS.log('right', xDiff, yDiff, xDown / $(document).width());
-            if (xDown / $(document).width() > .60) {
+            BS.log('right', xDiff, yDiff, xDown / innerWidth);
+            if (xDown / innerWidth > .60) {
                 nicklist.style.display = 'none';
             }
-            else if (xDown / $(document).width() < .15) {
+            else if (xDown / innerWidth < .15) {
                 switchbar.style.display = '';
             }
         }
@@ -60,3 +80,12 @@ function handleTouchMove(evt) {
         yDown = null;
     }
 }
+
+addEventListener('mousemove', function (e) {
+    if (e.clientX < innerWidth * 0.05) {
+        switchbar.style.display = '';
+    }
+    if (e.clientX > innerWidth * 0.95) {
+        nicklist.style.display = '';
+    }
+});

@@ -1,9 +1,10 @@
 $(function(){
     $.contextMenu({
-        selector: '#nicklist',
+        selector: '#nicklist, .user',
         className: 'contextmenu-custom',
         build: function($trigger, e) {
-            var vars = {text: BSWindow.active.server.ident.snicks().replace(/,/g, ' '), chan: BSWindow.active.server.ident.active()};
+            var user = e.target.classList.contains('user') && e.target.getAttribute('data-user');
+            var vars = {text: user || BSWindow.active.server.ident.snicks().replace(/,/g, ' '), chan: BSWindow.active.server.ident.active()};
             return {
                 items: {
                     "$1 $iif($address($1,0),( $+ $gettok($address($1,0),2-,33) $+ ))": {

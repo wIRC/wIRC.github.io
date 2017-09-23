@@ -101,7 +101,8 @@ var BS = {
             BSWindow.active.editbox.focus();
         });
 
-        document.getElementById('scrollBox').addEventListener("dblclick", function () {
+        document.getElementById('scrollBox').addEventListener("dblclick", function (e) {
+            if (e.target.getAttribute('data-user') || e.target.getAttribute('data-chan')) return;
             var active = BSWindow.active;
             if (BS.util.isChanName(active.label)) {
                 active.server.alias('MODE ' + active.label);
@@ -558,30 +559,28 @@ var BS = {
             max = Number(max);
             return Math.round(Math.random() * (max - min) + min);
         },
-        ircformat: function (str) {
+        ircformat: function (str, nicksMatch) {
             //b k i r o u
             if (!str) return "";
 
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="b">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="u">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="i">$1</u>');
-            str = str.replace(/(https?:\/\/)([^ <]+\/?)\b/ig, function (match, p1, p2) {
-                // html is already sanitized
-                return '<a target="_blank" href="' + match + '">' + match + '</a>';
-                //return '<a target="_blank" href="'+ p1 + p2.replace(/[a-z]/ig, function (match) { return '%' + parseInt(match.charCodeAt(0)).toString(16); }) +'">' + match + '</a>';
-
-                //var a = document.createElement('a');
-                //a.setAttribute('target', 'blank');
-                //a.setAttribute('href', match);
-                //a.appendChild(document.createTextNode(match));
-                //return a.outerHTML;
-            });
-            BS.log('ircformat:', str);
             str = str.replace(/(1[0-5]|0?\d)(?:,(1[0-5]|0?\d))?([^]*)(?:(?=|)|$)/g, function (match, c, bc, text) {
                 return '<u class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</u>';
             });
             str = str.replace(/|/g, '');
-
+            str = str.replace(
+                // fixme: shashes not being included
+                new RegExp('((?:(?:https?|ftp|file|irc[s6])://|(?:mailto|magnet|data):)[^ <]+)|(^| )(/?)(r/[a-z0-9_]+)|(\\B#[^ ,]+)' + (nicksMatch ? '|' + nicksMatch : ''), 'ig'),
+                function (match, url, subPrefix, subSlash, sub, chan, userPrefix, user) {
+                    BS.log("match:", match, "url:", url, "chan:", chan, "user:", user);
+                    if (url) return '<a target="_blank" href="' + match + '">' + match + '</a>';
+                    else if (sub) return subPrefix + '<a target="_blank" href="https://www.reddit.com/' + sub + '">' + subSlash + sub + '</a>';
+                    else if (chan) return '<u class="chan" data-chan="' + chan + '">' + chan + '</u>';
+                    else if (user) return userPrefix + '<u class="user" data-user="' + user + '">' + user + '</u>';
+                }
+            );
             return str;
         },
         getObjectKeys: function (obj) {
@@ -604,7 +603,7 @@ function BSServer(hostname, port, init) {
     this.me = null;
     this.nick = (BSConf.nick || (
             function () {
-                var domain = hostname.split('.').slice(-2, -1)[0];
+                var domain = hostname.replace(/^.+?([^.]+)(\.[a-z]+|)$/i, "$1");
                 return domain.slice(0, 1).toUpperCase() + domain.slice(1, 4).toLowerCase();
             }
         )()) + BS.util.rand(10000, 99999);
@@ -1415,10 +1414,10 @@ BSAlias.prototype.say = function () {
     this.server.alias('MSG', this.server.ident.active(), this.text);
 };
 BSAlias.prototype.serverAlias = function () {
-    var regs = this.text.match(/([^ :]+)(?:[ :](\+?\d+)?)(?:[ :](.+))?/);
+    var regs = this.text.match(/([^ :]+)(?:[ :](\+?\d+))?(?:[ :](.+))?/);
     if (regs) {
         var server = new BSServer(regs[1], regs[2], {password: regs[3]});
-        MB.connect(server);
+        MB.connectServer(server);
     }
     else this.server.alias('ECHO', '* /server: invalid parameters.');
 };
@@ -1607,7 +1606,7 @@ function BSChan(name, win) {
 BSChan.prototype.updateNicksMatch = function () {
     var nicks = [];
     for (var i = 0; i < this.nicks.length; i++) nicks.push(escapeRegExp(this.nicks[i]));
-    this.nicksMatch = nicks.length ? new RegExp('([^a-z0-9_\\-\\\\\[\\]\\{\\}^`\\|#]|^)(' + nicks.join('|') + ')(?=[^a-z0-9_\\-\\\\\[\\]\\{\\}^`\\|]|$)', 'gi') : null;
+    this.nicksMatch = nicks.length ? '([^a-z0-9_\\-\\\\\[\\]\\{\\}^`\\|#]|^)(' + nicks.join('|') + ')(?=[^a-z0-9_\\-\\\\\[\\]\\{\\}^`\\|]|$)' : null;
 };
 BSChan.prototype.addUser = function (nick, prefix) {
     this.users[nick.toLowerCase()] = new BSUser(nick, prefix);
@@ -2090,8 +2089,12 @@ BSWindow.prototype.addLine = function (text) {
         embed = '<video onload="restoreScroll()" width="400" height="225" src="' + matches[0] + '" controls="controls" preload="metadata"></video>';
     }
 
+    // nick match in text
+    var chan = this.server.getChan(this.label);
+    var nicksMatch = chan && chan.nicksMatch;
+
     // format text (to HTML)
-    text = BS.util.ircformat(BS.util.htmlEntities(text));
+    text = BS.util.ircformat(BS.util.htmlEntities(text), nicksMatch);
 
     // add embed
     if (embed) {
@@ -2102,35 +2105,6 @@ BSWindow.prototype.addLine = function (text) {
     // add to DOM
     var line = document.createElement("p");
     line.innerHTML = text;
-
-    /*
-    // ind all text nodes in the line
-    var textNodes = (function (){
-        var n, a = [], walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT, null, false);
-        while (n = walk.nextNode()) a.push(n);
-        return a;
-    })();
-
-    //find chans
-    var match, regex = /\B#[^ ,]+/g;
-    for (var i = 0; i < textNodes.length; i++) {
-        if (match = textNodes[i].textContent.match(regex)) {
-            textNodes[i].parentNode.innerHTML = textNodes[i].textContent.replace(regex, '<u class="chan" data-chan="$&">$&</u>');
-        }
-    }
-
-    //find nicks
-    var chan = this.server.getChan(this.label);
-    if (chan && chan.nicksMatch) {
-        var match, regex = chan.nicksMatch;
-        for (var i = 0; i < textNodes.length; i++) {
-            if (match = textNodes[i].textContent.match(regex)) {
-                BS.log(textNodes[i].parentNode.outerHTML);
-                textNodes[i].parentNode.innerHTML = textNodes[i].textContent.replace(regex, '$1<u class="user" data-user="$2">$2</u>');
-            }
-        }
-    }
-    */
 
     //detect if scrollBox is totally scrolled
     this.saveScrollState();

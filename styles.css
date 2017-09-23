@@ -23,8 +23,8 @@ u {
     text-decoration: none;
 }
 #nicklist {
-  _height: 100%;
-  vertical-align: top
+    vertical-align: top;
+    max-width: 25%;
 }
 #nicklist, .user, .chan {
     cursor: pointer;
@@ -46,6 +46,9 @@ u {
     font-weight: bold;
     justify-content: center;
     margin-left: 20px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 #body {
     border-top: 1px solid;
@@ -58,6 +61,7 @@ u {
     border-left: 1px solid;
     height: 100%;
     margin-top: 1px;
+    max-width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     outline: 0;
@@ -86,16 +90,22 @@ u {
     margin: 3px 0 3px 0;
 }
 #switchbar {
-    vertical-align: top;
+    max-width: 25%;
     padding: 2px;
+    vertical-align: top;
+}
+#switchbar span {
+    width: 180px;
+    max-width: 100%;
 }
 #switchbar span.button {
     margin-bottom: 2px;
     line-height: 1.5em;
-    width: 180px;
     display: block;
     text-align: center;
     cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
 }
 #editboxes {
     display: flex;
@@ -219,7 +229,9 @@ u {
     max-width: 50%;
     max-height: 225px;
 }
-
+.embed iframe, .embed video {
+    max-width: 50%;
+}
 
 ::-webkit-scrollbar {
     width: 14px;
