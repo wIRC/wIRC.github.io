@@ -279,6 +279,15 @@ var MB = {
         if (!regs) throw new Error('Error parsing raw line: ' + line);
         var prefix = regs[1], command = regs[2], params = regs[3], trailing = regs[4] || '';
         switch (command.toUpperCase()) {
+            case 'TOPIC':
+                var pars = params.split(" ");
+                var targets = pars[0].split(',');
+                pars.push(trailing);
+                var topic = pars.slice(1).join(" ");
+                for (var i = 0; i < targets.length; i++) {
+                    MB.send({"cmd": "text", "chan": targets[i], "data": "/topic " + topic, "channel": "IRCClient:" + server.hostname});
+                }
+                break;
             case 'PRIVMSG': {
                 var targets = params.split(',');
                 for (var i = 0; i < targets.length; i++) {
