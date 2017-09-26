@@ -9,6 +9,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
 })(function () {
 
     var emojiPicker = document.getElementById("emojiPicker");
+    var emojiButton = document.getElementById("emojiButton");
     var emojiContainer = document.getElementById("emojiContainer");
     var emojiSearchInput = document.getElementById("emojiSearchInput");
     var categoryContent = function (cat, items) {
@@ -97,7 +98,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
         BS.UI.emojiPicker.saveStats();
     }
 
-    document.getElementById("emojiButton").addEventListener("click", BS.UI.emojiPicker.toggle);
+    emojiButton.addEventListener("click", BS.UI.emojiPicker.toggle);
     emojiSearchInput.addEventListener("input", BS.UI.emojiPicker.updateContent);
     emojiContainer.addEventListener('click', function (e) {
         if (e.target.classList.contains("emoji")) {
@@ -128,6 +129,12 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
         if (category) {
             var categoryTitle = document.getElementById("emojiCategory" + category);
             categoryTitle.scrollIntoView();
+        }
+    });
+
+    document.addEventListener("click", function (e) {
+        if (BS.UI.emojiPicker.state && e.target != emojiButton && !e.path.includes(emojiPicker)) {
+           BS.UI.emojiPicker.hide();
         }
     });
 
