@@ -12,7 +12,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
     var emojiContainer = document.getElementById("emojiContainer");
     var emojiSearchInput = document.getElementById("emojiSearchInput");
     var categoryContent = function (cat, items) {
-        var listContent = items.map(function (e) { return '<span class="emoji">' + e + '</span>'; }).join("");
+        var listContent = items.map(function (e) { return '<span class="emoji" title="' + e[1].join(", ") + '">' + e[0] + '</span>'; }).join("");
         return '<span class="emojiCategory" id="emojiCategory' + cat + '">' + cat + '</span>' +
                 '<span class="emojiList">' + listContent + '</span>'
     };
@@ -45,7 +45,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
                 var fa = used[a], fb = used[b];
                 return fa > fb ? -1 : (fb > fa ? 1 : 0);
             });
-            return usedEmojis;
+            return usedEmojis.map(function (e) { return [e, [""]] });
         },
         generateContent: function (content) {
             emojiContainer.innerHTML = content.map(function (e) { return categoryContent(e[0], e[1]); }).join("");
@@ -56,7 +56,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
             if (mostUsed.length) result.push(['Frequently Used', mostUsed.slice(0, 10)]);
             for (var i = 0; i < emojiCategories.length; i++) {
                 var cat = emojiCategories[i];
-                var itemsEmoji = emojis[cat].map(function (e) { return e[0]; });
+                var itemsEmoji = emojis[cat].map(function (e) { return e; });
                 result.push([cat, itemsEmoji]);
             }
             return result;
@@ -78,11 +78,11 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
                     var emojiNames = emoji[1];
                     for (var j = 0; j < emojiNames.length; j++) {
                         if (emojiNames[j].startsWith(text)) {
-                            resultStarts.push(emoji[0]);
+                            resultStarts.push(emoji);
                             break;
                         }
                         else if (emojiNames[j].includes(text)) {
-                            resultIncludes.push(emoji[0]);
+                            resultIncludes.push(emoji);
                             break;
                         }
                     }
@@ -99,7 +99,6 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
 
     document.getElementById("emojiButton").addEventListener("click", BS.UI.emojiPicker.toggle);
     emojiSearchInput.addEventListener("input", BS.UI.emojiPicker.updateContent);
-    emojiSearchInput.addEventListener("focusout", BS.UI.emojiPicker.hide);
     emojiContainer.addEventListener('click', function (e) {
         if (e.target.classList.contains("emoji")) {
             var emoji = e.target.innerHTML;
@@ -114,16 +113,16 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
 
     var emojiTabs = document.getElementById("emojiTabs");
     var emojiTabsEls = ["Frequently Used"].concat(emojiCategories).map(function (e) {
-        return '<span data-category="' + e + '" style="background-image:url(images/Emoji' + e.replace(" ", "") + '.svg)"></span>';
+        return '<span data-category="' + e + '" title="' + e + '" style="background-image:url(images/Emoji' + e.replace(" ", "") + '.svg)"></span>';
     });
     emojiTabs.innerHTML = emojiTabsEls.join("");
-    emojiPicker.addEventListener("mousedown", function (e) {
+    emojiTabs.addEventListener("mousedown", function (e) {
         e.preventDefault(); // prevent focus
     });
     emojiTabs.addEventListener("click", function (e) {
         if (emojiSearchInput.value) {
             emojiSearchInput.value = "";
-            BS.UI.emojiPicker.generateContent();
+            BS.UI.emojiPicker.updateContent();
         }
         var category = e.target.getAttribute("data-category");
         if (category) {
