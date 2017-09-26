@@ -14,6 +14,7 @@
         <script src="popups.js" charset="UTF-8" async></script>
         <script src="aliases.js" charset="UTF-8" async></script>
         <script src="sets.js" charset="UTF-8" async></script>
+        <script src="emoji.js" charset="UTF-8" async></script>
         <script src="mircscript/parser.js" charset="UTF-8"></script>
         <script src="mircscript/mircscript.js" charset="UTF-8"></script>
         <script src="touch.js" charset="UTF-8"></script>
@@ -34,7 +35,38 @@
                 <span id="switchbar"></span>
                 <span id="middle">
                     <span id="scrollBox"></span>
-                    <span id="editboxes"></span>
+                    <span id="editboxes">
+                        <table id="colorPicker">
+                            <tbody>
+                            <tr>
+                                <td class="bc0">0</td>
+                                <td class="bc1">1</td>
+                                <td class="bc2">2</td>
+                                <td class="bc3">3</td>
+                                <td class="bc4">4</td>
+                                <td class="bc5">5</td>
+                                <td class="bc6">6</td>
+                                <td class="bc7">7</td>
+                            </tr>
+                            <tr>
+                                <td class="bc8">8</td>
+                                <td class="bc9">9</td>
+                                <td class="bc10">10</td>
+                                <td class="bc11">11</td>
+                                <td class="bc12">12</td>
+                                <td class="bc13">13</td>
+                                <td class="bc14">14</td>
+                                <td class="bc15">15</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div id="emojiPicker">
+                            <input id="emojiSearchInput" type="text" placeholder="Search Emojis" />
+                            <div id="emojiContainer"></div>
+                            <div id="emojiTabs"></div>
+                        </div>
+                        <img id="emojiButton" src="emoji.png" />
+                    </span>
                 </span>
                 <span id="nicklist"></span>
             </span>

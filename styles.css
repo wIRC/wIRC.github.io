@@ -113,6 +113,7 @@ u {
     justify-content: center;
     align-items: stretch;
     min-height: 52px;
+    position: relative;
 }
 #editboxes textarea {
     padding: 8px;
@@ -273,4 +274,80 @@ hr {
 }
 #setsTabs {
     flex: 1;
+}
+#colorPicker {
+    display: none;
+    bottom: 100%;
+    color: #000;
+    left: 10px;
+    position: absolute;
+    text-align: center;
+}
+#colorPicker td {
+    width: 18px;
+    border: solid 3px #888;
+    cursor: pointer;
+}
+#emojiPicker {
+    display: none;
+    bottom: 100%;
+    right: 20px;
+    position: absolute;
+    width: 346px;
+    background-color: #fff;
+    border: 1px solid hsla(0,0%,75%,.2);
+    border-radius: 5px;
+}
+.emojiList {
+    display: flex;
+    flex-wrap: wrap;
+}
+#emojiContainer {
+    height: 328px;
+    overflow-y: scroll;
+}
+#emojiContainer::-webkit-scrollbar-thumb {
+    background-color: #3671ad;
+}
+#emojiContainer::-webkit-scrollbar-track-piece {
+    background-color: #e3e3e3;
+}
+.emoji {
+    width: 28px;
+    height: 28px;
+    margin: 2px;
+    color: #000;
+    text-align: center;
+}
+.emoji:hover {
+    background-color: #eceeef;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.emojiCategory {
+    font-size: 12px;
+    line-height: 32px;
+    padding: 0 4px;
+    text-transform: uppercase;
+}
+#emojiButton {
+    position: absolute;
+    height: 32px;
+    right: 10px;
+    cursor: pointer;
+}
+#emojiSearchInput {
+    color: #737f8d;
+    padding: 5px 7px;
+    background-color: rgba(199,209,216,.3);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    margin: 12px;
+}
+#emojiTabs > span {
+    cursor: pointer;
+    padding: 10px 19px 19px 19px;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    display: inline-block;
 }

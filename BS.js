@@ -163,6 +163,15 @@ var BS = {
             break;
         }
 
+        document.getElementById("colorPicker").addEventListener("click", function (e) {
+            var matches = e.target.className.match(/bc(\d+)/);
+            if (matches) {
+                BSWindow.active.editbox.appendText(matches[1]);
+            }
+        });
+
+
+
     },
     onUnload: function () {
         for (var i in BS.servers) BS.servers[i].alias('DISCONNECT');
@@ -173,7 +182,7 @@ var BS = {
         BS.sets.saveState();
         BS.plogs.store();
     },
-    log: localStorage.getItem("debug", false) ? console.log.bind(console, 'BS') : function () {},
+    log: !localStorageAvailable() || localStorage.getItem("debug", false) ? console.log.bind(console, 'BS') : function () {},
     sets: {
         get: function (name) {
             try {
@@ -251,6 +260,7 @@ var BS = {
             BS.sets.set("sets", BS.prefs);
         },
         backup: function () {
+            if (!localStorageAvailable()) return;
             var sets = {};
             for (var i in localStorage) {
                 if (localStorage.hasOwnProperty(i)) {
@@ -367,6 +377,17 @@ var BS = {
             if ('t' in params) text = BSIdent.prototype.timestamp() + text;
 
             (win || BSWindow.active).addLine(text);
+        },
+        colorPicker: {
+            state: false,
+            show: function () {
+                BS.UI.colorPicker.state = true;
+                document.getElementById("colorPicker").style.display = 'block';
+            },
+            hide: function () {
+                BS.UI.colorPicker.state = false;
+                document.getElementById("colorPicker").style.display = 'none';
+            }
         },
         flash: {
             oldTitle: "",
@@ -574,7 +595,7 @@ var BS = {
                 // fixme: shashes not being included
                 new RegExp('((?:(?:https?|ftp|file|irc[s6])://|(?:mailto|magnet|data):)[^ <]+)|(^| )(/?)(r/[a-z0-9_]+)|(\\B#[^ ,]+)' + (nicksMatch ? '|' + nicksMatch : ''), 'ig'),
                 function (match, url, subPrefix, subSlash, sub, chan, userPrefix, user) {
-                    BS.log("match:", match, "url:", url, "chan:", chan, "user:", user);
+                    // BS.log("match:", match, "url:", url, "chan:", chan, "user:", user);
                     if (url) return '<a target="_blank" href="' + match + '">' + match + '</a>';
                     else if (sub) return subPrefix + '<a target="_blank" href="https://www.reddit.com/' + sub + '">' + subSlash + sub + '</a>';
                     else if (chan) return '<u class="chan" data-chan="' + chan + '">' + chan + '</u>';
@@ -1673,6 +1694,7 @@ function BSEditbox(label, win) {
     document.getElementById('editboxes').appendChild(this.obj);
     this.obj.addEventListener("keydown", function (e) { parent.onKeyDown(e); }, true);
     this.obj.addEventListener("input", function (e) { parent.onChange(e); }, true)
+    this.obj.addEventListener("blur", function (e) { parent.onBlur(e); }, true);
 }
 BSEditbox.prototype.destroy = function () {
     this.obj.parentNode.removeChild(this.obj);
@@ -1684,7 +1706,12 @@ BSEditbox.prototype.show = function () {
 BSEditbox.prototype.hide = function () {
     this.obj.style.display = 'none';
 };
-BSEditbox.prototype.appendText = function (text) { this.setText(this.getText() + text); };
+BSEditbox.prototype.appendText = function (text) {
+    var leftText = this.getLeftText() + text;
+    var rightText = this.getRightText();
+    this.setText(leftText + rightText);
+    this.obj.selectionStart = this.obj.selectionEnd = leftText.length;
+};
 BSEditbox.prototype.focus = function () { this.obj.focus(); };
 BSEditbox.prototype.getText = function () { return this.obj.value; };
 BSEditbox.prototype.onInput = function (e) {
@@ -1718,12 +1745,19 @@ BSEditbox.prototype.onInput = function (e) {
     }
     return false;
 };
+BSEditbox.prototype.onBlur = function (e) {
+    //if (BS.UI.colorPicker.state) BS.UI.colorPicker.hide();
+};
 BSEditbox.prototype.onChange = function (e) {
     var lines = (this.obj.value.match(/\n/g) || []).length + 1;
     this.win.saveScrollState();
     this.obj.setAttribute('rows', lines);
     this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 4 + 12) + 'px';
     this.win.restoreScrollState();
+    // close colorPicker
+    if (BS.UI.colorPicker.state) {
+        if (!/(\d{1,2}(,\d?)?)?$/.test(this.getLeftText())) BS.UI.colorPicker.hide();
+    }
 };
 BSEditbox.prototype.onKeyDown = function (e) {
     //BS.log(e.keyCode+" "+e.ctrlKey);
@@ -1734,18 +1768,19 @@ BSEditbox.prototype.onKeyDown = function (e) {
         if (ctrlCode) {
             e.preventDefault();
             this.appendText(ctrlCode);
+
+            if (e.keyCode == 75) BS.UI.colorPicker.show();
         }
     }
     switch (e.keyCode) {
         //tab
         case 9: {
             e.preventDefault();
-
             // eval idents
             var server = this.win.server;
-            let leftText = this.obj.value.substr(0, this.obj.selectionEnd);
+            let leftText = this.getLeftText();
             if (leftText.match(/\$[^ ]|#$/)) {
-                let rightText = this.obj.value.substr(this.obj.selectionEnd);
+                let rightText = this.getRightText();
                 if (leftText.match(/#$/) && BS.util.isChanName(BSWindow.active.label)) {
                     leftText = leftText.replace(/#$/, BSWindow.active.label);
                 }
@@ -1830,6 +1865,12 @@ BSEditbox.prototype.setText = function (text) {
     this.obj.value = text;
     this.onChange();
     this.focus();
+};
+BSEditbox.prototype.getLeftText = function () {
+    return this.obj.value.substr(0, this.obj.selectionEnd);
+};
+BSEditbox.prototype.getRightText = function () {
+    return this.obj.value.substr(this.obj.selectionEnd);
 };
 
 function BSEvent(type, data, e) {
@@ -2162,6 +2203,7 @@ BSWindow.prototype.deselected = function () {
     if (this.nicklist) this.nicklist.deselected();
     this.editbox.hide();
     this.server.switchbar.deselected(this.button);
+    if (BS.UI.colorPicker.state) BS.UI.colorPicker.hide();
 };
 BSWindow.prototype.select = function () {
     BSWindow.stack.remove(this.wid);
@@ -2189,6 +2231,7 @@ BSPLogger.prototype.add = function (network, label, text) {
 };
 BSPLogger.prototype.store = function () {
     // BS.log('Storing logs:', this.logs);
+    if (!localStorageAvailable()) return;
     for (var i in this.logs) if (this.logs[i].length) {
         var id = 'plogs_' + i;
         try {
@@ -2308,6 +2351,12 @@ function durationLong(s) {
 }
 function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+function localStorageAvailable() {
+    try {
+        return localStorage;
+    }
+    catch (e) { console.log(e); }
 }
 
 document.addEventListener("DOMContentLoaded", BS.onLoad);
