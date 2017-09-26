@@ -39,22 +39,33 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
             else BS.UI.emojiPicker.show();
         },
         saveStats: function () { BS.sets.set("emoji", BS.UI.emojiPicker.stats); },
-        computeMostUsed: function () {
+        computeMostUsed: function (limit) {
             var used = BS.UI.emojiPicker.stats.used;
-            var usedEmojis = Object.keys(used);
-            usedEmojis.sort(function (a, b) {
+            var sorted = Object.keys(used);
+            sorted.sort(function (a, b) {
                 var fa = used[a], fb = used[b];
                 return fa > fb ? -1 : (fb > fa ? 1 : 0);
             });
-            return usedEmojis.map(function (e) { return [e, [""]] });
+            var index = {};
+            for (var i = 0, j = Math.min(limit, sorted.length); i < j; i++) {
+                index[sorted[i]] = i;
+            }
+            var result = [];
+            for (cat in emojis) {
+                var items = emojis[cat];
+                for (var i = 0; i < items.length; i++) {
+                    if (items[i][0] in index) result[index[items[i][0]]] = items[i];
+                }
+            }
+            return result;
         },
         generateContent: function (content) {
             emojiContainer.innerHTML = content.map(function (e) { return categoryContent(e[0], e[1]); }).join("");
         },
         computeContent: function () {
             var result = [];
-            var mostUsed = BS.UI.emojiPicker.computeMostUsed();
-            if (mostUsed.length) result.push(['Frequently Used', mostUsed.slice(0, 10)]);
+            var mostUsed = BS.UI.emojiPicker.computeMostUsed(10);
+            if (mostUsed.length) result.push(['Frequently Used', mostUsed]);
             for (var i = 0; i < emojiCategories.length; i++) {
                 var cat = emojiCategories[i];
                 var itemsEmoji = emojis[cat].map(function (e) { return e; });
@@ -89,7 +100,23 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
                     }
                 }
             }
+            // sort by most used
+            var used = BS.UI.emojiPicker.stats && BS.UI.emojiPicker.stats.used;
+            if (used) {
+                var sortFunction = function (a, b) {
+                    var fa = used[a[0]] || 0, fb = used[b[0]] || 0;
+                    return fa > fb ? -1 : (fb > fa ? 1 : 0);
+                };
+                resultStarts.sort(sortFunction);
+                resultIncludes.sort(sortFunction);
+            }
             return ['Search Results', resultStarts.concat(resultIncludes)];
+        },
+        incEmojiCount: function (emoji) {
+            var stats = BS.UI.emojiPicker.stats;
+            if (stats.used[emoji]) stats.used[emoji]++;
+            else stats.used[emoji] = 1;
+            BS.UI.emojiPicker.saveStats();
         }
     };
 
@@ -105,10 +132,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
             var emoji = e.target.innerHTML;
             BSWindow.active.editbox.appendText(emoji);
             BS.UI.emojiPicker.hide();
-            var stats = BS.UI.emojiPicker.stats;
-            if (stats.used[emoji]) stats.used[emoji]++;
-            else stats.used[emoji] = 1;
-            BS.UI.emojiPicker.saveStats();
+            BS.UI.emojiPicker.incEmojiCount(emoji);
         }
     });
 

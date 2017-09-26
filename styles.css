@@ -351,3 +351,16 @@ hr {
     background-position: 50%;
     display: inline-block;
 }
+#matchResults {
+    border-radius: 7px;
+    bottom: 100%;
+    cursor: pointer;
+    display: none;
+    left: 6px;
+    padding: 4px;
+    position: absolute;
+}
+#matchResults > div {
+    border-radius: 3px;
+    padding: 2px 6px 2px 6px;
+}

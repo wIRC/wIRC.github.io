@@ -5,7 +5,7 @@ body {
 a {
     color: #fff;
 }
-input, textarea, select, span.button {
+input, textarea, select, span.button, #matchResults {
     background-color: #262626;
     border-color: #4c4c4c;
     color: #ccc;
@@ -28,7 +28,7 @@ input, textarea, select, span.button {
 .nick {
     color: #808080;
 }
-span.button.selected {
+span.button.selected, #matchResults > div:hover, #matchResults > div.selected {
     background-color: #4c4c4c;
     color: #fff;
 }

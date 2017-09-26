@@ -135,6 +135,11 @@ var BS = {
                     }
                 }
             }
+            // close match results when clicking outside its element
+            if (BS.UI.matchResults.state) {
+                var matchResultsElement = document.getElementById("matchResults");
+                if (!e.path.includes(matchResultsElement)) BS.UI.matchResults.hide();
+            }
         });
 
         addEventListener("beforeunload", BS.onUnload);
@@ -167,6 +172,15 @@ var BS = {
             var matches = e.target.className.match(/bc(\d+)/);
             if (matches) {
                 BSWindow.active.editbox.appendText(matches[1]);
+            }
+        });
+
+        var matchResultsElement = document.getElementById("matchResults");
+        matchResultsElement.addEventListener("click", function (e) {
+            for (var i = 0; i < e.path.length; i++) {
+                if (e.path[i].parentNode == matchResultsElement) {
+                    return BS.UI.matchResults.callback(e.path[i]);
+                }
             }
         });
 
@@ -387,6 +401,48 @@ var BS = {
             hide: function () {
                 BS.UI.colorPicker.state = false;
                 document.getElementById("colorPicker").style.display = 'none';
+            }
+        },
+        matchResults: {
+            callback: null,
+            state: false,
+            selectedId: 0,
+            totalMatches: 0,
+            show: function (callback, matches) {
+                BS.UI.matchResults.state = true;
+                BS.UI.matchResults.callback = callback;
+                if (matches !== undefined) BS.UI.matchResults.update(matches);
+                document.getElementById("matchResults").style.display = 'block';
+            },
+            hide: function () {
+                BS.UI.matchResults.state = false;
+                var matchResults = document.getElementById("matchResults");
+                matchResults.style.display = 'none';
+                matchResults.innerHTML = '';
+            },
+            update: function (matches) {
+                BS.UI.matchResults.totalMatches = matches.length;
+                document.getElementById("matchResults").innerHTML = matches.map(function (e) {
+                    return '<div>' + e + '</div>';
+                }).reverse().join("");
+                BS.UI.matchResults.select(1, true);
+            },
+            select: function (id, reset) {
+                var matchResults = document.getElementById("matchResults");
+                if (!reset) {
+                    matchResults.childNodes[BS.UI.matchResults.totalMatches - BS.UI.matchResults.selectedId].classList.remove("selected");
+                }
+                matchResults.childNodes[BS.UI.matchResults.totalMatches - id].classList.add("selected");
+                BS.UI.matchResults.selectedId = id;
+            },
+            selectNext: function () {
+                BS.UI.matchResults.select(BS.UI.matchResults.selectedId == BS.UI.matchResults.totalMatches ? 1 : BS.UI.matchResults.selectedId + 1);
+            },
+            selectPrevious: function () {
+                BS.UI.matchResults.select(BS.UI.matchResults.selectedId == 1 ? BS.UI.matchResults.totalMatches : BS.UI.matchResults.selectedId - 1);
+            },
+            matchSelected: function () {
+                BS.UI.matchResults.callback(document.getElementById("matchResults").childNodes[BS.UI.matchResults.totalMatches - BS.UI.matchResults.selectedId]);
             }
         },
         flash: {
@@ -1707,10 +1763,7 @@ BSEditbox.prototype.hide = function () {
     this.obj.style.display = 'none';
 };
 BSEditbox.prototype.appendText = function (text) {
-    var leftText = this.getLeftText() + text;
-    var rightText = this.getRightText();
-    this.setText(leftText + rightText);
-    this.obj.selectionStart = this.obj.selectionEnd = leftText.length;
+    this.setLeftText(this.getLeftText() + text);
 };
 BSEditbox.prototype.focus = function () { this.obj.focus(); };
 BSEditbox.prototype.getText = function () { return this.obj.value; };
@@ -1754,10 +1807,34 @@ BSEditbox.prototype.onChange = function (e) {
     this.obj.setAttribute('rows', lines);
     this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 4 + 12) + 'px';
     this.win.restoreScrollState();
+    var leftText = this.getLeftText();
     // close colorPicker
     if (BS.UI.colorPicker.state) {
-        if (!/(\d{1,2}(,\d?)?)?$/.test(this.getLeftText())) BS.UI.colorPicker.hide();
+        if (!/(\d{1,2}(,\d?)?)?$/.test(leftText)) BS.UI.colorPicker.hide();
     }
+    var matches = leftText.match(/(?:^| ):([a-z_-]*)$/);
+    if (matches && matches[1].length != 1) {
+        var result = matches[1] ? BS.UI.emojiPicker.search(matches[1])[1] : BS.UI.emojiPicker.computeMostUsed(15);
+        if (result.length) {
+            var editbox = this;
+            BS.UI.matchResults.show(
+                function (e) {
+                    BS.log("clicked match:", e);
+                    var match = e.firstChild.getAttribute("data-match");
+                    BS.UI.emojiPicker.incEmojiCount(match);
+                    leftText = leftText.replace(/:[^:]*$/, match);
+                    editbox.setLeftText(leftText);
+                },
+                result.map(function (e) {
+                    return '<span style="width:2em;display:inline-block" data-match="' + e[0] + '">' + e[0] + "</span> "
+                        + e[1].join(", ").replace(matches[1], '<b>' + matches[1] + '</b>');
+                })
+            );
+        }
+        else if (BS.UI.matchResults.state) BS.UI.matchResults.hide();
+    }
+    else if (BS.UI.matchResults.state) BS.UI.matchResults.hide();
+
 };
 BSEditbox.prototype.onKeyDown = function (e) {
     //BS.log(e.keyCode+" "+e.ctrlKey);
@@ -1776,27 +1853,44 @@ BSEditbox.prototype.onKeyDown = function (e) {
         //tab
         case 9: {
             e.preventDefault();
+
+            let leftText = this.getLeftText();
+
+            // match results
+            if (BS.UI.matchResults.state) {
+                if (e.shiftKey) BS.UI.matchResults.selectPrevious();
+                else BS.UI.matchResults.selectNext();
+                break;
+            }
+
             // eval idents
             var server = this.win.server;
-            let leftText = this.getLeftText();
-            if (leftText.match(/\$[^ ]|#$/)) {
-                let rightText = this.getRightText();
-                if (leftText.match(/#$/) && BS.util.isChanName(BSWindow.active.label)) {
-                    leftText = leftText.replace(/#$/, BSWindow.active.label);
+            var matches = leftText.match(/(?:\$[^ ]+|#[^ ]*)$/);
+            if (matches) {
+                var token = matches[0];
+                // todo: make it like user auto-complete
+                if (token.charAt(0) == "#") {
+                    var lowerCaseToken = token.toLowerCase();
+                    if (BS.util.isChanName(BSWindow.active.label) && BSWindow.active.label.startsWith(lowerCaseToken)) {
+                        leftText = leftText.replace(/#[^ ]*$/, BSWindow.active.label);
+                    }
+                    else {
+                        for (chan in server.chans) {
+                            if (chan.startsWith(lowerCaseToken)) {
+                                leftText = leftText.replace(/#[^ ]*$/, chan);
+                                break;
+                            }
+                        }
+                    }
                 }
-                else {
-                    leftText = leftText.replace(/\$[^ ]+$/, function (match) {
-                        return server.evalCommand(match);
-                    });
-                }
-                this.setText(leftText + rightText);
-                this.obj.selectionStart = this.obj.selectionEnd = leftText.length;
+                else leftText = leftText.replace(/\$[^ ]+$/, server.evalCommand(token));
+                this.setLeftText(leftText);
             }
 
             // user auto-complete
             if (!this.tabText) {
                 this.tabIndex = 0;
-                this.tabText = new RegExp('^' + this.getText().match(/[^ ]*$/), 'i');
+                this.tabText = new RegExp('^' + leftText.match(/[^ ]*$/), 'i');
                 this.tabMatch = [];
                 var chan = server.getChan(this.label);
                 if (chan) {
@@ -1810,7 +1904,7 @@ BSEditbox.prototype.onKeyDown = function (e) {
                 }
             }
             if (!this.tabMatch.length) break;
-            this.setText(this.getText().replace(/[^ ]*$/, this.tabMatch[this.tabIndex].nick));
+            this.setLeftText(leftText.replace(/[^ ]*$/, this.tabMatch[this.tabIndex].nick));
             this.focus();
             this.tabIndex++;
             this.tabIndex %= this.tabMatch.length;
@@ -1820,14 +1914,19 @@ BSEditbox.prototype.onKeyDown = function (e) {
         //enter
         case 13: {
             if (!e.shiftKey) {
-                this.onInput(e);
+                if (BS.UI.matchResults.state) BS.UI.matchResults.matchSelected();
+                else this.onInput(e);
                 e.preventDefault();
             }
             break;
         }
         //up key
         case 38: {
-            if (!/\n/.test(this.obj.value.slice(0, this.obj.selectionEnd))) {
+            if (BS.UI.matchResults.state) {
+                BS.UI.matchResults.selectNext();
+                e.preventDefault();
+            }
+            else if (!/\n/.test(this.obj.value.slice(0, this.obj.selectionEnd))) {
                 if (this.history.length && this.historyIndex < this.history.length) {
                     if (this.historyIndex == 0) { // enter history mode adding the current text
                         this.history.push(this.getText());
@@ -1847,7 +1946,11 @@ BSEditbox.prototype.onKeyDown = function (e) {
         }
         //down key
         case 40: {
-            if (!/\n/.test(this.obj.value.slice(this.obj.selectionEnd))) {
+            if (BS.UI.matchResults.state) {
+                BS.UI.matchResults.selectPrevious();
+                e.preventDefault();
+            }
+            else if (!/\n/.test(this.obj.value.slice(this.obj.selectionEnd))) {
                 if (this.history.length && this.historyIndex > 1) {
                     this.historyIndex--;
                     this.setText(this.history[this.history.length - this.historyIndex]);
@@ -1861,11 +1964,19 @@ BSEditbox.prototype.onKeyDown = function (e) {
         }
     }
 };
-BSEditbox.prototype.setText = function (text) {
-    this.obj.value = text;
+BSEditbox.prototype.setText = function (leftText, rightText) {
+    if (rightText) {
+        this.obj.value = leftText + rightText;
+        this.obj.selectionStart = this.obj.selectionEnd = leftText.length;
+    }
+    else {
+        this.obj.value = leftText;
+    }
     this.onChange();
     this.focus();
 };
+BSEditbox.prototype.setLeftText = function (leftText) { this.setText(leftText, this.getRightText()); };
+
 BSEditbox.prototype.getLeftText = function () {
     return this.obj.value.substr(0, this.obj.selectionEnd);
 };
