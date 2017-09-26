@@ -34,7 +34,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
             emojiPicker.style.display = 'none';
         },
         toggle: function () {
-            if (!BS.UI.emojiPicker.state) BS.UI.emojiPicker.hide();
+            if (BS.UI.emojiPicker.state) BS.UI.emojiPicker.hide();
             else BS.UI.emojiPicker.show();
         },
         saveStats: function () { BS.sets.set("emoji", BS.UI.emojiPicker.stats); },
