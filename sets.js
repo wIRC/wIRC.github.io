@@ -49,6 +49,12 @@
         setsHighlightWords.value = BS.prefs.highlightWords;
         var downloadBackup = document.getElementById('downloadBackup');
         downloadBackup.href = BS.sets.backup();
+        var prefElements = document.querySelectorAll("[data-pref]");
+        for (var i = 0; i < prefElements.length; i++) {
+            var e = prefElements[i];
+            var prefName = e.getAttribute("data-pref");
+            e.checked = BS.prefs[prefName];
+        }
         BS.UI.modal.show('settings');
     });
     var settingOkButtonCallback = function (close) {
@@ -63,6 +69,12 @@
             BS.prefs.scheme = setsSchemeDark.checked ? "dark" : "black";
             BS.prefs.highlightWords = setsHighlightWords.value;
             BS.prefs.highlightWindow = setsHighlightWindow.checked;
+            var prefElements = document.querySelectorAll("[data-pref]");
+            for (var i = 0; i < prefElements.length; i++) {
+                var e = prefElements[i];
+                var prefName = e.getAttribute("data-pref");
+                BS.prefs[prefName] = e.checked;
+            }
             BS.UI.updateStyle();
             BS.sets.savePrefs();
             if (close) BS.UI.modal.hide('settings');

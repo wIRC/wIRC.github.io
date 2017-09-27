@@ -79,6 +79,7 @@
                         <button data-tab="setsTabAppearance" class="selected">Appearance</button>
                         <button data-tab="setsTabIRC">IRC</button>
                         <button data-tab="setsTabScript">Scripting</button>
+                        <button data-tab="setsTabEmoji">Emoji</button>
                         <button data-tab="setsTabAdvanced">Advanced</button>
                     </div>
                     <div id="setsTabs">
@@ -103,6 +104,13 @@
                         </div>
                         <div id="setsTabScript">
                             <textarea rows="12" id="userScript"></textarea><br />
+                        </div>
+                        <div id="setsTabEmoji">
+                            <p><label><input type="checkbox" id="setsEmojiSearch" data-pref="emojiSearch"> Display emoji results when typing :emoji_name.</label></p>
+                            <p><label><input type="checkbox" id="setsEmojiHistory" data-pref="emojiHistory"> Display most used emojis when typing :.</label></p>
+                            <p><label><input type="checkbox" id="setsEmojiSuggestion" data-pref="emojiSuggestion"> Display emoji suggestion when typing smileys.</label></p>
+                            <p><label><input type="checkbox" id="setsEmojiReplace" data-pref="emojiReplace"> Automatically replace smileys by emojis as you type.</label></p>
+                            <p><label><input type="checkbox" id="setsEmojiReplaceInput" data-pref="emojiReplaceInput"> Automatically replace smileys when sending message.</label></p>
                         </div>
                         <div id="setsTabAdvanced">
                             <p>

@@ -179,7 +179,7 @@ var BS = {
         matchResultsElement.addEventListener("click", function (e) {
             for (var i = 0; i < e.path.length; i++) {
                 if (e.path[i].parentNode == matchResultsElement) {
-                    return BS.UI.matchResults.callback(e.path[i]);
+                    return BS.UI.matchResults.match(e.path[i].getAttribute("data-matchIndex"));
                 }
             }
         });
@@ -260,12 +260,17 @@ var BS = {
             var defaultPrefs = {
                 userScript: '',
                 fontSize: 15,
-                bufferLimit: 1050,
+                bufferLimit: 1000,
                 showEmbeds: true,
                 hideNSFW: true,
                 scheme: "dark",
                 highlightWords: "",
-                highlightWindow: false
+                highlightWindow: false,
+                emojiSearch: true,
+                emojiHistory: true,
+                emojiSuggestion: true,
+                emojiReplace: true,
+                emojiReplaceInput: true
             };
             BS.prefs = BS.sets.get("sets") || {};
             for (var i in defaultPrefs) if (!(i in BS.prefs)) BS.prefs[i] = defaultPrefs[i];
@@ -371,18 +376,18 @@ var BS = {
             return '15o Usermode: ' + modes;
         }
     },/*
-    mts: {
-        theme: {
-            'RAW.001': '<pre><c2> <text>'
-        },
-        parse: function (name) {
-            BS.mts.parsed[name] || (BS.mts.parsed[name] = (function () {
-                var source = BS.mts.theme[name];
+     mts: {
+     theme: {
+     'RAW.001': '<pre><c2> <text>'
+     },
+     parse: function (name) {
+     BS.mts.parsed[name] || (BS.mts.parsed[name] = (function () {
+     var source = BS.mts.theme[name];
 
-            }));
-        },
-        parsed: {}
-    },*/
+     }));
+     },
+     parsed: {}
+     },*/
     UI: {
         beep: function () { document.getElementById("beep").play(); },
         echo: function (text, win, params) {
@@ -405,13 +410,16 @@ var BS = {
         },
         matchResults: {
             callback: null,
+            matcher: null,
+            mapper: null,
             state: false,
-            selectedId: 0,
-            totalMatches: 0,
-            show: function (callback, matches) {
+            show: function (matcher, mapper, callback) {
                 BS.UI.matchResults.state = true;
                 BS.UI.matchResults.callback = callback;
-                if (matches !== undefined) BS.UI.matchResults.update(matches);
+                BS.UI.matchResults.matcher = matcher;
+                BS.UI.matchResults.mapper = mapper;
+                BS.UI.selectedId = 0;
+                BS.UI.matchResults.update();
                 document.getElementById("matchResults").style.display = 'block';
             },
             hide: function () {
@@ -420,29 +428,36 @@ var BS = {
                 matchResults.style.display = 'none';
                 matchResults.innerHTML = '';
             },
-            update: function (matches) {
-                BS.UI.matchResults.totalMatches = matches.length;
-                document.getElementById("matchResults").innerHTML = matches.map(function (e) {
-                    return '<div>' + e + '</div>';
+            update: function () {
+                document.getElementById("matchResults").innerHTML = BS.UI.matchResults.matcher.matches.map(function (e, i) {
+                    return '<div data-matchIndex="' + (i + 1) + '">' + BS.UI.matchResults.mapper(e, i) + '</div>';
                 }).reverse().join("");
-                BS.UI.matchResults.select(1, true);
+                BS.UI.matchResults.selectedId = 0;
+                BS.UI.matchResults.updateSelection();
             },
-            select: function (id, reset) {
+            updateSelection: function () {
                 var matchResults = document.getElementById("matchResults");
-                if (!reset) {
-                    matchResults.childNodes[BS.UI.matchResults.totalMatches - BS.UI.matchResults.selectedId].classList.remove("selected");
+                if (BS.UI.matchResults.selectedId) {
+                    matchResults.childNodes[BS.UI.matchResults.matcher.matches.length - BS.UI.matchResults.selectedId].classList.remove("selected");
                 }
-                matchResults.childNodes[BS.UI.matchResults.totalMatches - id].classList.add("selected");
-                BS.UI.matchResults.selectedId = id;
-            },
-            selectNext: function () {
-                BS.UI.matchResults.select(BS.UI.matchResults.selectedId == BS.UI.matchResults.totalMatches ? 1 : BS.UI.matchResults.selectedId + 1);
+                if (BS.UI.matchResults.matcher.selectedId) {
+                    matchResults.childNodes[BS.UI.matchResults.matcher.matches.length - BS.UI.matchResults.matcher.selectedId].classList.add("selected");
+                }
+                BS.UI.matchResults.selectedId = BS.UI.matchResults.matcher.selectedId;
             },
             selectPrevious: function () {
-                BS.UI.matchResults.select(BS.UI.matchResults.selectedId == 1 ? BS.UI.matchResults.totalMatches : BS.UI.matchResults.selectedId - 1);
+                BS.UI.matchResults.matcher.selectPrevious();
+                BS.UI.matchResults.updateSelection();
+            },
+            selectNext: function () {
+                BS.UI.matchResults.matcher.selectNext();
+                BS.UI.matchResults.updateSelection();
+            },
+            match: function (id) {
+                BS.UI.matchResults.callback(BS.UI.matchResults.matcher.matches[id - 1]);
             },
             matchSelected: function () {
-                BS.UI.matchResults.callback(document.getElementById("matchResults").childNodes[BS.UI.matchResults.totalMatches - BS.UI.matchResults.selectedId]);
+                BS.UI.matchResults.match(BS.UI.matchResults.matcher.selectedId);
             }
         },
         flash: {
@@ -1061,11 +1076,11 @@ BSServer.prototype.onEvent = function (e) {
                     var nick = params.word(1), reason = trailing, inChannel = false;
                     var message = BS.theme.away(nick, reason);
                     /*for (var chan in this.chans) {
-                        if (this.getChanUser(chan, nick)) {
-                            this.alias('ECHO', chan, message);
-                            inChannel = true;
-                        }
-                    }*/
+                     if (this.getChanUser(chan, nick)) {
+                     this.alias('ECHO', chan, message);
+                     inChannel = true;
+                     }
+                     }*/
                     if (!inChannel) this.alias('ECHO', message);
                     e.mute = true;
                     break;
@@ -1769,6 +1784,20 @@ BSEditbox.prototype.focus = function () { this.obj.focus(); };
 BSEditbox.prototype.getText = function () { return this.obj.value; };
 BSEditbox.prototype.onInput = function (e) {
     this.win.server.lastInputTime = Date.now();
+
+    if (BS.prefs.emojiReplaceInput) {
+        var text = this.getText();
+        var matches = text.match(/[^ ]+$/);
+        BS.log(matches);
+        if (matches) {
+            var result = BS.UI.emojiPicker.searchAscii(matches[0]);
+            if (result) {
+                text = text.replace(/[^ ]+$/, result[0][0]);
+                this.setText(text);
+            }
+        }
+    }
+
     var splitLongLines = function (str) {
         return str.replace(/^(.{400})(.+)/gm, function (match, p1, p2) { return p1 + "\n" + splitLongLines(p2); });
     };
@@ -1808,32 +1837,48 @@ BSEditbox.prototype.onChange = function (e) {
     this.obj.parentNode.style['min-height'] = (20 * Math.min(15, lines) + 16 + 4 + 12) + 'px';
     this.win.restoreScrollState();
     var leftText = this.getLeftText();
+    var leftWord = leftText.match(/[^ ]*$/)[0];
     // close colorPicker
     if (BS.UI.colorPicker.state) {
         if (!/(\d{1,2}(,\d?)?)?$/.test(leftText)) BS.UI.colorPicker.hide();
     }
-    var matches = leftText.match(/(?:^| ):([a-z_-]*)$/);
-    if (matches && matches[1].length != 1) {
-        var result = matches[1] ? BS.UI.emojiPicker.search(matches[1])[1] : BS.UI.emojiPicker.computeMostUsed(15);
-        if (result.length) {
-            var editbox = this;
-            BS.UI.matchResults.show(
-                function (e) {
-                    BS.log("clicked match:", e);
-                    var match = e.firstChild.getAttribute("data-match");
-                    BS.UI.emojiPicker.incEmojiCount(match);
-                    leftText = leftText.replace(/:[^:]*$/, match);
-                    editbox.setLeftText(leftText);
-                },
-                result.map(function (e) {
-                    return '<span style="width:2em;display:inline-block" data-match="' + e[0] + '">' + e[0] + "</span> "
-                        + e[1].join(", ").replace(matches[1], '<b>' + matches[1] + '</b>');
-                })
-            );
+    if (BS.prefs.emojiReplace && !leftWord) {
+    var matches = leftText.match(/([^ ]+) $/);
+        if (matches) {
+            var result = BS.UI.emojiPicker.searchAscii(matches[1]);
+            if (result) {
+                leftText = leftText.replace(/[^ ]+ $/, result[0][0] + " ");
+                this.setLeftText(leftText);
+            }
+        }
+    }
+    // fixme: multiline
+    if (!this.historyIndex) { // fixme: dirty hack
+        var matches = leftText.match(/(?:^| ):([a-z_-]*)$/);
+        var asciiEmoji = false;
+        if (matches && matches[1].length != 1 || (asciiEmoji = BS.prefs.emojiSuggestion && BS.UI.emojiPicker.searchAscii(leftWord))) {
+            var result = asciiEmoji ? asciiEmoji : (matches[1] ? (BS.prefs.emojiSearch && BS.UI.emojiPicker.search(matches[1])) : (BS.prefs.emojiHistory && BS.UI.emojiPicker.computeMostUsed(15)));
+            if (result && result.length) {
+                var editbox = this;
+                BS.UI.matchResults.show(
+                    new BSMatcher(result, asciiEmoji ? 0 : 1),
+                    function (e) {
+                        var names = e[1].join(", ");
+                        if (matches && matches[1]) names = names.replace(matches[1], '<b>' + matches[1] + '</b>');
+                        return '<span style="width:2em;display:inline-block">' + e[0] + "</span> " + names;
+                    },
+                    function (e) {
+                        BS.log("clicked match:", e);
+                        BS.UI.emojiPicker.incEmojiCount(e[0]);
+                        leftText = leftText.replace(/[^ ]+$/, e[0]);
+                        editbox.setLeftText(leftText);
+                    }
+                );
+            }
+            else if (BS.UI.matchResults.state) BS.UI.matchResults.hide();
         }
         else if (BS.UI.matchResults.state) BS.UI.matchResults.hide();
     }
-    else if (BS.UI.matchResults.state) BS.UI.matchResults.hide();
 
 };
 BSEditbox.prototype.onKeyDown = function (e) {
@@ -1858,7 +1903,8 @@ BSEditbox.prototype.onKeyDown = function (e) {
 
             // match results
             if (BS.UI.matchResults.state) {
-                if (e.shiftKey) BS.UI.matchResults.selectPrevious();
+                if (BS.UI.matchResults.matcher.matches.length == 1) BS.UI.matchResults.match(1);
+                else if (e.shiftKey) BS.UI.matchResults.selectPrevious();
                 else BS.UI.matchResults.selectNext();
                 break;
             }
@@ -1914,7 +1960,7 @@ BSEditbox.prototype.onKeyDown = function (e) {
         //enter
         case 13: {
             if (!e.shiftKey) {
-                if (BS.UI.matchResults.state) BS.UI.matchResults.matchSelected();
+                if (BS.UI.matchResults.state && BS.UI.matchResults.selectedId) BS.UI.matchResults.matchSelected();
                 else this.onInput(e);
                 e.preventDefault();
             }
@@ -2139,7 +2185,7 @@ BSNicklist.prototype.update = function () {
             var pla = BS.util.prefixLevel(server, a.prefix), plb = BS.util.prefixLevel(server, b.prefix);
             return pla == plb ?
                 a.user.localeCompare(b.user) :
-                pla - plb;
+            pla - plb;
         });
         for (var i = 0; i < nicklist.length; i++) {
             this.element.appendChild(nicklist[i].el);
@@ -2426,6 +2472,20 @@ BSLogger.prototype.store = function () {
     BS.sets.set('logs', this.logs);
 };
 
+function BSMatcher(matches, selectedId) {
+    this.matches = matches;
+    this.selectedId = selectedId;
+}
+BSMatcher.prototype.selectNext = function () {
+    this.selectedId = (this.selectedId == this.matches.length ? 1 : this.selectedId + 1);
+};
+BSMatcher.prototype.selectPrevious = function () {
+    this.selectedId = (this.selectedId == 1 ? this.matches.length : this.selectedId - 1);
+};
+BSMatcher.prototype.getSelected = function () {
+    return this.matches[this.selectedId - 1];
+};
+
 Array.prototype.remove = function (value) {
     var index = this.indexOf(value);
     if (index > -1) this.splice(index, 1);
@@ -2447,18 +2507,18 @@ String.prototype.word = function (index) {
 };
 
 function durationLong(s) {
-  if (s <= 0) return "Now";
-  var makeDuration = function (firstValue, firstLabelSingular, firstLabelPlural, secondValue, secondLabelSingular, secondLabelPlural) {
-    return firstValue + ' ' +
-        (firstValue == 1 ? firstLabelSingular : firstLabelPlural) +
-        (secondValue ? ' ' + "and" + ' ' + secondValue + ' ' +
-          (secondValue == 1 ? secondLabelSingular : secondLabelPlural) : '');
-  };
-  if (s < 60) return makeDuration(s, "second", "seconds", 0);
-  if (s < 3600) return makeDuration(Math.floor(s / 60), "minute", "minutes", s % 60, "second", "seconds");
-  if (s < 86400) return makeDuration(Math.floor(s / 3600), "hour", "hours", Math.floor(s % 3600 / 60), "minute", "minutes");
-  if (s < 31557600) return makeDuration(Math.floor(s / 86400), "day", "days", Math.floor(s % 86400 / 3600), "hour", "hours");
-  return makeDuration(Math.floor(s / 31557600), "year", "years", Math.floor(s % 31557600 / 86400), "day", "days");
+    if (s <= 0) return "Now";
+    var makeDuration = function (firstValue, firstLabelSingular, firstLabelPlural, secondValue, secondLabelSingular, secondLabelPlural) {
+        return firstValue + ' ' +
+            (firstValue == 1 ? firstLabelSingular : firstLabelPlural) +
+            (secondValue ? ' ' + "and" + ' ' + secondValue + ' ' +
+            (secondValue == 1 ? secondLabelSingular : secondLabelPlural) : '');
+    };
+    if (s < 60) return makeDuration(s, "second", "seconds", 0);
+    if (s < 3600) return makeDuration(Math.floor(s / 60), "minute", "minutes", s % 60, "second", "seconds");
+    if (s < 86400) return makeDuration(Math.floor(s / 3600), "hour", "hours", Math.floor(s % 3600 / 60), "minute", "minutes");
+    if (s < 31557600) return makeDuration(Math.floor(s / 86400), "day", "days", Math.floor(s % 86400 / 3600), "hour", "hours");
+    return makeDuration(Math.floor(s / 31557600), "year", "years", Math.floor(s % 31557600 / 86400), "day", "days");
 }
 function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");

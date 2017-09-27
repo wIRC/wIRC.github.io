@@ -46,18 +46,21 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
                 var fa = used[a], fb = used[b];
                 return fa > fb ? -1 : (fb > fa ? 1 : 0);
             });
+            return BS.UI.emojiPicker.computeEmojiArray(sorted.slice(0, limit));
+        },
+        computeEmojiArray: function (emojiList) {
             var index = {};
-            for (var i = 0, j = Math.min(limit, sorted.length); i < j; i++) {
-                index[sorted[i]] = i;
+            for (let i = 0; i < emojiList.length; i++) {
+                index[emojiList[i]] = i;
             }
             var result = [];
             for (cat in emojis) {
                 var items = emojis[cat];
-                for (var i = 0; i < items.length; i++) {
+                for (let i = 0; i < items.length; i++) {
                     if (items[i][0] in index) result[index[items[i][0]]] = items[i];
                 }
             }
-            return result;
+            return result.filter(function (e) { return e != undefined; });
         },
         generateContent: function (content) {
             emojiContainer.innerHTML = content.map(function (e) { return categoryContent(e[0], e[1]); }).join("");
@@ -75,7 +78,7 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
         },
         updateContent: function () {
             if (emojiSearchInput.value) {
-                BS.UI.emojiPicker.generateContent([BS.UI.emojiPicker.search(emojiSearchInput.value)]);
+                BS.UI.emojiPicker.generateContent([['Search Results', BS.UI.emojiPicker.search(emojiSearchInput.value)]]);
             }
             else  BS.UI.emojiPicker.generateContent(BS.UI.emojiPicker.computeContent());
         },
@@ -110,7 +113,64 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
                 resultStarts.sort(sortFunction);
                 resultIncludes.sort(sortFunction);
             }
-            return ['Search Results', resultStarts.concat(resultIncludes)];
+            return resultStarts.concat(resultIncludes);
+        },
+        searchAscii: function (text) {
+            switch (text) {
+                case '<3': return BS.UI.emojiPicker.computeEmojiArray(["\u2764\uFE0F"]);
+                case ':o)': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDC35"]);
+                case '</3': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDC94"]);
+                case '=)':
+                case '=-)': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE03"]);
+                case 'C:':
+                case 'c:':
+                case ':D':
+                case ':-D': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE04"]);
+                case ':>':
+                case ':->': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE06"]);
+                case ';)':
+                case ';-)': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE09"]);
+                case '8)': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE0E"]);
+                case ':|':
+                case ':-|': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE10"]);
+                case ':\\':
+                case ':-\\':
+                case ':\/':
+                case ':-\/': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE15"]);
+                case ':*':
+                case ':-*': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE18"]);
+                case ':p':
+                case ':-p':
+                case ':P':
+                case ':-P':
+                case ':b':
+                case ':-b': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE1B"]);
+                case ';p':
+                case ';-p':
+                case ';b':
+                case ';-b':
+                case ';P':
+                case ';-P': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE1C"]);
+                case '):':
+                case ':(':
+                case ':-(': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE1E"]);
+                case '>:(':
+                case '>:-(': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE1F"]);
+                case ':\'(': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE22"]);
+                case 'D:': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE27"]);
+                case ':o':
+                case ':-o':
+                case ':O':
+                case ':-O': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE2E"]);
+                case ':)':
+                case '(:':
+                case ':-)': return BS.UI.emojiPicker.computeEmojiArray(["\uD83D\uDE42"]);
+                case 'xP': return BS.UI.emojiPicker.computeEmojiArray(["😝"]);
+                case 'xD': return BS.UI.emojiPicker.computeEmojiArray(["😆"]);
+                case '\':D': return BS.UI.emojiPicker.computeEmojiArray(["😅"]);
+                case ':\'o': return BS.UI.emojiPicker.computeEmojiArray(["😥"]);
+                case ':\'\'(': return BS.UI.emojiPicker.computeEmojiArray(["😭"]);
+            }
         },
         incEmojiCount: function (emoji) {
             var stats = BS.UI.emojiPicker.stats;
