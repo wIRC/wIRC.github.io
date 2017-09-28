@@ -154,6 +154,11 @@ var BS = {
                 }
                 e.preventDefault();
             }
+            // ctrl+l: show separator
+            if (e.ctrlKey && e.keyCode == 76 && !e.shiftKey && !e.altKey) {
+                var separator = BSWindow.active.msgBox.querySelector("hr");
+                 if (separator) separator.scrollIntoView();
+            }
         });
 
         document.addEventListener("visibilitychange", function() {
@@ -1183,7 +1188,10 @@ BSServer.prototype.onEvent = function (e) {
                     break;
                 }
                 case '367': {
-                    e.theme = [[params.word(1), '15o Bans: 15 ' + params.word(2) + ' 07by 15' + params.word(3) + ' 07on 15' + BSIdent.prototype.asctime(params.word(4))]];
+                    var label = '@Bans-' + params.word(1);
+                    if (!this.getWindow(label)) this.alias('WINDOW', label);
+                    this.alias('ECHO', label, params.word(2) + ' 07by 15' + params.word(3) + ' 07on 15' + BSIdent.prototype.asctime(params.word(4)));
+                    e.mute = true;
                     break;
                 }
                 case '378': {
@@ -1917,13 +1925,13 @@ BSEditbox.prototype.onKeyDown = function (e) {
                 // todo: make it like user auto-complete
                 if (token.charAt(0) == "#") {
                     var lowerCaseToken = token.toLowerCase();
-                    if (BS.util.isChanName(BSWindow.active.label) && BSWindow.active.label.startsWith(lowerCaseToken)) {
-                        leftText = leftText.replace(/#[^ ]*$/, BSWindow.active.label);
+                    if (BS.util.isChanName(this.label) && this.label.toLowerCase().startsWith(lowerCaseToken)) {
+                        leftText = leftText.replace(/#[^ ]*$/, this.label);
                     }
                     else {
                         for (chan in server.chans) {
                             if (chan.startsWith(lowerCaseToken)) {
-                                leftText = leftText.replace(/#[^ ]*$/, chan);
+                                leftText = leftText.replace(/#[^ ]*$/, server.getChan(chan).name);
                                 break;
                             }
                         }
@@ -1947,6 +1955,13 @@ BSEditbox.prototype.onKeyDown = function (e) {
                     this.tabMatch.sort(function (a, b) {
                         return a.lastMessage == b.lastMessage ?
                             (a.nick.toLowerCase() < b.nick.toLowerCase() ? -1 : 1) : b.lastMessage - a.lastMessage; });
+                }
+                else {
+                    var matches = leftText.match(/[^ ]+$/);
+                    if (matches && this.label.toLowerCase().startsWith(matches[0].toLowerCase())) {
+                        leftText = leftText.replace(/[^ ]+$/, this.label);
+                        this.setLeftText(leftText);
+                    }
                 }
             }
             if (!this.tabMatch.length) break;
@@ -2070,8 +2085,10 @@ BSSwitchbar.prototype.addButton = function (label, win) {
         var win = BSWindow.windows[e.target.getAttribute('data-wid')];
         var server = win.server;
         if (server.getChan(win.label)) {
-            server.alias('PART', win.label);
-            server.remChan(win.label);
+            if (confirm('Leave ' + win.label + '?')) {
+                server.alias('PART', win.label);
+                server.remChan(win.label);
+            }
         }
         else if (server.getQuery(win.label)) {
             server.remQuery(win.label);

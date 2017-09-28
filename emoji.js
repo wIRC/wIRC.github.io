@@ -170,6 +170,9 @@ var emojis = {"Symbols":[["❤️",["heart"]],["💛",["yellow_heart"]],["💚",
                 case '\':D': return BS.UI.emojiPicker.computeEmojiArray(["😅"]);
                 case ':\'o': return BS.UI.emojiPicker.computeEmojiArray(["😥"]);
                 case ':\'\'(': return BS.UI.emojiPicker.computeEmojiArray(["😭"]);
+                case '\\o/': return BS.UI.emojiPicker.computeEmojiArray(["🙌"]);
+                case '*.*': return BS.UI.emojiPicker.computeEmojiArray(["😍"]);
+                case '-_-': return BS.UI.emojiPicker.computeEmojiArray(["😑"]);
             }
         },
         incEmojiCount: function (emoji) {
