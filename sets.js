@@ -53,7 +53,13 @@
         for (var i = 0; i < prefElements.length; i++) {
             var e = prefElements[i];
             var prefName = e.getAttribute("data-pref");
-            e.checked = BS.prefs[prefName];
+            if (e.type == 'checkbox') e.checked = BS.prefs[prefName];
+            else if (e.tagName == 'SELECT') {
+                for (let option of e.options) {
+                    if (option.value == BS.prefs[prefName]) option.selected = true;
+                }
+            }
+            else e.checked = BS.prefs[prefName];
         }
         BS.UI.modal.show('settings');
     });
@@ -73,7 +79,7 @@
             for (var i = 0; i < prefElements.length; i++) {
                 var e = prefElements[i];
                 var prefName = e.getAttribute("data-pref");
-                BS.prefs[prefName] = e.checked;
+                BS.prefs[prefName] = e.type == 'checkbox' ? e.checked : e.value;
             }
             BS.UI.updateStyle();
             BS.sets.savePrefs();

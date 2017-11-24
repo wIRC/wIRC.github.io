@@ -157,7 +157,8 @@ var BS = {
             // ctrl+l: show separator
             if (e.ctrlKey && e.keyCode == 76 && !e.shiftKey && !e.altKey) {
                 var separator = BSWindow.active.msgBox.querySelector("hr");
-                 if (separator) separator.scrollIntoView();
+                if (separator) separator.scrollIntoView();
+                e.preventDefault();
             }
         });
 
@@ -264,6 +265,7 @@ var BS = {
         loadPrefs: function () {
             var defaultPrefs = {
                 userScript: '',
+                fontFamily: '',
                 fontSize: 15,
                 bufferLimit: 1000,
                 showEmbeds: true,
@@ -338,7 +340,7 @@ var BS = {
             //return '07(' + BS.theme.prefix(prefix) + '15' + nick + '07) ' + text;
         },
         msgSelf: function (prefix, nick, text) {
-            return BS.theme.prefix(prefix) + '00' + nick + '07 ' + text;
+            return BS.theme.prefix(prefix) + '00' + nick + '07 ' + text;
             //return '07(' + BS.theme.prefix(prefix) + '00' + nick + '07) ' + text;
         },
         nick: function (nick, newnick) {
@@ -400,7 +402,7 @@ var BS = {
             //add timestamp
             if ('t' in params) text = BSIdent.prototype.timestamp() + text;
 
-            (win || BSWindow.active).addLine(text);
+            (win || BSWindow.active).addTextLine(text);
         },
         colorPicker: {
             state: false,
@@ -601,6 +603,7 @@ var BS = {
             styleObj.innerHTML = 'body { font-size: ' + BS.prefs.fontSize + 'px; }\n';
             if (!BS.prefs.showEmbeds) styleObj.innerHTML += '.embed { display: none; }\n';
             if (BS.prefs.hideNSFW) styleObj.innerHTML += '.nsfw { display: none; }\n';
+            if (BS.prefs.fontFamily) styleObj.innerHTML += '#scrollBox { font-family: ' + BS.prefs.fontFamily + '; }\n';
             document.getElementById("scheme").setAttribute("href", BS.prefs.scheme == "dark" ? "scheme-dark.css" : "scheme-black.css");
         },
         updateTitle: function () {
@@ -658,8 +661,100 @@ var BS = {
         },
         ircformat: function (str, nicksMatch) {
             //b k i r o u
+
             if (!str) return "";
 
+            var parseIrcColors = function(str) {
+                var result = '';
+                var stateStack = [];
+                var removedStack = [];
+                var states = {c: false, bc: false, b: false, u: false, i: false};
+
+                var toggleState = function (state) {
+                    return states[state.type] ? removeState(state) : pushState(state);
+                };
+                var replaceState = function (state) {
+                    return removeState(state) + pushState(state);
+                };
+                var removeState = function (state) {
+                    if (!states[state.type]) return '';
+                    var topState = stateStack[stateStack.length - 1];
+                    if (topState.type == state.type) return popState();
+                    return popState() + removeState(state) + pushState(topState);
+                    /*
+                    var result = '';
+                    removedStack = [];
+                    while (states[state.type]) {
+                        result += popState();
+                    }
+                    removedStack.pop();
+                    while (removedStack.length) {
+                        result += pushState(removedStack.pop());
+                    }
+                    return result;
+                    */
+                };
+
+                var pushState = function (state) {
+                    stateStack.push(state);
+                    states[state.type] = true;
+                    switch (state.type) {
+                        case 'c': return '<u class="c' + state.c + '">';
+                        case 'bc': return '<u class="bc' + state.bc + '">';
+                        case 'u': return '<u class="u">';
+                        case 'b': return '<b>';
+                        case 'i': return '<i>';
+                    }
+                };
+
+                var popState = function () {
+                    var state = stateStack.pop();
+                    removedStack.push(state);
+                    states[state.type] = false;
+                    switch (state.type) {
+                        case 'b': return '</b>';
+                        case 'i': return '</i>';
+                        default: return '</u>';
+                    }
+                };
+                var popStates = function () {
+                    while (stateStack.length) result += popState();
+                };
+
+                var matches;
+                while (str) {
+                    var c = str.charAt(0);
+                    if (c == '' && (matches = str.match(/(?:(\d\d?)(?:,(\d\d?))?)?(.*)/))) {
+                        var colour = Number(matches[1]);
+                        if (matches[2]) {
+                            let bc = Number(matches[2]);
+                            if (bc > 15) result += removeState({type: 'c'}) + removeState({type: 'bc'});
+                            else result += removeState({type: 'c'}) + replaceState({type: 'bc', bc: bc});
+                        }
+                        if (matches[1]) {
+                            let c = Number(matches[1]);
+                            if (c > 15) result += removeState({type: 'c'});
+                            result += replaceState({type: 'c', c: c});
+                        }
+                        else result += removeState({type: 'c'}) + removeState({type: 'bc'});
+                        str = matches[3];
+                    }
+                    else {
+                        switch (c) {
+                            case '': result += toggleState({type: 'b'}); break;
+                            case '': result += toggleState({type: 'u'}); break;
+                            case '': result += toggleState({type: 'i'}); break;
+                            case '': popStates(); break;
+                            default: result += c;
+                        }
+                        str = str.slice(1);
+                    }
+                }
+                popStates();
+                return result.replace(/> +</g, '>&nbsp;<');
+            };
+
+            /*
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="b">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="u">$1</u>');
             str = str.replace(/([^]+)(?:(?=)||$)/g, '<u class="i">$1</u>');
@@ -667,6 +762,9 @@ var BS = {
                 return '<u class="c' + Number(c) + (bc ? ' ' + 'bc' + Number(bc) : '') + '">' + text + '</u>';
             });
             str = str.replace(/|/g, '');
+            */
+            str = parseIrcColors(str);
+
             str = str.replace(
                 // fixme: shashes not being included
                 new RegExp('((?:(?:https?|ftp|file|irc[s6])://|(?:mailto|magnet|data):)[^ <]+)|(^| )(/?)(r/[a-z0-9_]+)|(\\B#[^ ,]+)' + (nicksMatch ? '|' + nicksMatch : ''), 'ig'),
@@ -2256,7 +2354,7 @@ BSWindow.prototype.setLabel = function (newLabel) {
     this.server.switchbar.relabelButton(this.label, newLabel);
     this.label = newLabel;
 };
-BSWindow.prototype.addLine = function (text) {
+BSWindow.prototype.addTextLine = function (text) {
     var msgBox = this.msgBox;
 
     // update button and add line separator (before adding the line)
@@ -2300,7 +2398,7 @@ BSWindow.prototype.addLine = function (text) {
         };
         embed = '<iframe onload="restoreScroll()" width="400" height="225" src="https://www.youtube.com/embed/' + matches[1] + "?start=" + parseTime(matches[2]) + '" frameborder="0" allowfullscreen></iframe>';
     }
-    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:mp4)(\?[^ ]+)?/i)) {
+    else if (matches = text.match(/https?:\/\/[^ ]+\.(?:mp4|webm)(\?[^ ]+)?/i)) {
         embed = '<video onload="restoreScroll()" width="400" height="225" src="' + matches[0] + '" controls="controls" preload="metadata"></video>';
     }
 
@@ -2318,8 +2416,11 @@ BSWindow.prototype.addLine = function (text) {
     }
 
     // add to DOM
+    this.addLine(text);
+};
+BSWindow.prototype.addLine = function (html) {
     var line = document.createElement("p");
-    line.innerHTML = text;
+    line.innerHTML = html;
 
     //detect if scrollBox is totally scrolled
     this.saveScrollState();
@@ -2331,7 +2432,7 @@ BSWindow.prototype.saveScrollState = function () {
     var scrollTop = scrollBox.scrollTop;
     scrollBox.scrollTop += 1;
     this.scroll = scrollTop == scrollBox.scrollTop ? scrollTop + 100000 : scrollTop;
-}
+};
 BSWindow.prototype.restoreScrollState = function () {
     document.getElementById("scrollBox").scrollTop = this.scroll;
 };

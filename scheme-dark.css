@@ -51,6 +51,9 @@ span.button.highlight {
 ::-webkit-scrollbar-thumb {
     background-color: #1e2124;
 }
+#scrollBox::-webkit-scrollbar-thumb {
+    border-color: #36393e;
+}
 ::-webkit-scrollbar-track-piece {
     background-color: #2e3136;
 }
